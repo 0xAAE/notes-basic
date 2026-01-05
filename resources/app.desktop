@@ -1,0 +1,11 @@
+[Desktop Entry]
+Name=Notes Basic
+Comment=BAsic implementation of sticky notes
+Type=Application
+Icon=com.github.aae.notes
+Exec=notes-basic %F
+Terminal=false
+StartupNotify=true
+Categories=COSMIC
+Keywords=COSMIC
+MimeType=
