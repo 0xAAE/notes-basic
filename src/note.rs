@@ -4,6 +4,11 @@ use uuid::Uuid;
 
 mod import;
 
+const EMTPY_TITLE: &str = "<Empty>";
+pub const NO_TITLE: &str = "Untitled";
+pub const NO_CONTENT: &str = "click inside to begin edit the content";
+const MAX_TITLE_CHARS: usize = 12;
+
 pub type NotesCollection = HashMap<Uuid, Note>;
 
 pub async fn try_load<P: AsRef<Path> + std::fmt::Debug>(
@@ -13,11 +18,27 @@ pub async fn try_load<P: AsRef<Path> + std::fmt::Debug>(
     Ok(parsed.into_iter().map(Into::into).collect())
 }
 
-#[derive(serde::Deserialize, Debug, Clone)]
+#[derive(serde::Deserialize, Debug, Clone, Default)]
 pub struct Note {
     content: String,
     modified: DateTime<Utc>,
     metadata: NoteMetadata,
+}
+
+impl Note {
+    pub fn get_title(&self) -> &str {
+        if self.content.is_empty() {
+            EMTPY_TITLE
+        } else {
+            self.content.lines().next().map_or(NO_TITLE, |line| {
+                &line.get(0..MAX_TITLE_CHARS).unwrap_or(NO_TITLE)
+            })
+        }
+    }
+
+    pub fn get_content(&self) -> &str {
+        self.content.as_str()
+    }
 }
 
 // Convert import::Note into (key, value) i.e. into (uuid, Note)
@@ -34,7 +55,7 @@ impl From<import::Note> for (Uuid, Note) {
     }
 }
 
-#[derive(serde::Deserialize, Debug, Clone)]
+#[derive(serde::Deserialize, Debug, Clone, Default)]
 struct NoteMetadata {
     position: (usize, usize),
     size: (usize, usize),

@@ -2,7 +2,7 @@
 
 use crate::config::Config;
 use crate::fl;
-use crate::note::{NotesCollection, try_load};
+use crate::note::{NO_CONTENT, NO_TITLE, NotesCollection, try_load};
 use cosmic::app::context_drawer;
 use cosmic::cosmic_config::{self, CosmicConfigEntry};
 use cosmic::iced::alignment::{Horizontal, Vertical};
@@ -12,6 +12,7 @@ use cosmic::{iced_futures, prelude::*};
 use futures_util::SinkExt;
 use std::collections::HashMap;
 use std::time::Duration;
+use uuid::Uuid;
 
 const REPOSITORY: &str = env!("CARGO_PKG_REPOSITORY");
 const APP_ICON: &[u8] = include_bytes!("../resources/icons/hicolor/scalable/apps/icon.svg");
@@ -46,7 +47,6 @@ pub struct AppModel {
 pub enum Message {
     LaunchUrl(String),
     ToggleContextPage(ContextPage),
-    ToggleWatch,
     UpdateConfig(Config),
     WatchTick(u32),
     //
@@ -82,23 +82,8 @@ impl cosmic::Application for AppModel {
         _flags: Self::Flags,
     ) -> (Self, Task<cosmic::Action<Self::Message>>) {
         // Create a nav bar with three page items.
-        let mut nav = nav_bar::Model::default();
-
-        nav.insert()
-            .text(fl!("page-id", num = 1))
-            .data::<Page>(Page::Page1)
-            .icon(icon::from_name("applications-science-symbolic"))
-            .activate();
-
-        nav.insert()
-            .text(fl!("page-id", num = 2))
-            .data::<Page>(Page::Page2)
-            .icon(icon::from_name("applications-system-symbolic"));
-
-        nav.insert()
-            .text(fl!("page-id", num = 3))
-            .data::<Page>(Page::Page3)
-            .icon(icon::from_name("applications-games-symbolic"));
+        let notes = NotesCollection::new();
+        let nav = Self::build_nav(&notes);
 
         // Create the about widget
         let about = About::default()
@@ -175,7 +160,7 @@ impl cosmic::Application for AppModel {
                 // tokio::task::spawn_blocking(move || try_load(DEF_DATA_FILE))
                 //     .await
                 //     .map(|task| {
-                //         task.await
+                //         task.await // compilation error!
                 //             .map(|v| Message::LoadNotesCompleted(v))
                 //             .map_err(|e| Message::LoadNotesFailed(format!("{e}")))
                 //     })
@@ -225,61 +210,49 @@ impl cosmic::Application for AppModel {
     /// events received by widgets will be passed to the update method.
     fn view(&self) -> Element<'_, Self::Message> {
         let space_s = cosmic::theme::spacing().space_s;
-        let content: Element<_> = match self.nav.active_data::<Page>().unwrap() {
-            Page::Page1 => {
-                let header = widget::row::with_capacity(2)
-                    .push(widget::text::title1(fl!("welcome")))
-                    .push(widget::text::title3(fl!("page-id", num = 1)))
-                    .align_y(Alignment::End)
-                    .spacing(space_s);
+        let content: Element<_> = if let Some(note_id) = self.nav.active_data::<Uuid>()
+            && let Some(note) = self.notes.get(note_id)
+        {
+            // Display selected note title & content
+            let header = widget::row::with_capacity(2)
+                .push(widget::text::title1(note.get_title()))
+                .push(widget::text::title3(note_id.to_string()))
+                .align_y(Alignment::End)
+                .spacing(space_s);
 
-                let counter_label = ["Watch: ", self.time.to_string().as_str()].concat();
-                let section = cosmic::widget::settings::section().add(
-                    cosmic::widget::settings::item::builder(counter_label).control(
-                        widget::button::text(if self.watch_is_active {
-                            "Stop"
-                        } else {
-                            "Start"
-                        })
-                        .on_press(Message::ToggleWatch),
-                    ),
-                );
+            let text = widget::row::with_capacity(1)
+                .push(widget::text::text(note.get_content()))
+                .align_y(Alignment::Start)
+                .spacing(space_s);
 
-                widget::column::with_capacity(2)
-                    .push(header)
-                    .push(section)
-                    .spacing(space_s)
-                    .height(Length::Fill)
-                    .into()
-            }
+            widget::column::with_capacity(2)
+                .push(header)
+                .spacing(space_s)
+                .height(Length::Shrink)
+                .push(text)
+                .spacing(space_s)
+                .height(Length::Fill)
+                .into()
+        } else {
+            // Display an empty note
+            let header = widget::row::with_capacity(1)
+                .push(widget::text::title1(NO_TITLE))
+                .align_y(Alignment::End)
+                .spacing(space_s);
 
-            Page::Page2 => {
-                let header = widget::row::with_capacity(2)
-                    .push(widget::text::title1(fl!("welcome")))
-                    .push(widget::text::title3(fl!("page-id", num = 2)))
-                    .align_y(Alignment::End)
-                    .spacing(space_s);
+            let text = widget::row::with_capacity(1)
+                .push(widget::text::text(NO_CONTENT))
+                .align_y(Alignment::Start)
+                .spacing(space_s);
 
-                widget::column::with_capacity(1)
-                    .push(header)
-                    .spacing(space_s)
-                    .height(Length::Fill)
-                    .into()
-            }
-
-            Page::Page3 => {
-                let header = widget::row::with_capacity(2)
-                    .push(widget::text::title1(fl!("welcome")))
-                    .push(widget::text::title3(fl!("page-id", num = 3)))
-                    .align_y(Alignment::End)
-                    .spacing(space_s);
-
-                widget::column::with_capacity(1)
-                    .push(header)
-                    .spacing(space_s)
-                    .height(Length::Fill)
-                    .into()
-            }
+            widget::column::with_capacity(1)
+                .push(header)
+                .spacing(space_s)
+                .height(Length::Shrink)
+                .push(text)
+                .spacing(space_s)
+                .height(Length::Fill)
+                .into()
         };
 
         widget::container(content)
@@ -342,10 +315,6 @@ impl cosmic::Application for AppModel {
                 self.time = time;
             }
 
-            Message::ToggleWatch => {
-                self.watch_is_active = !self.watch_is_active;
-            }
-
             Message::ToggleContextPage(context_page) => {
                 if self.context_page == context_page {
                     // Close the context drawer if the toggled context page is the same.
@@ -375,7 +344,7 @@ impl cosmic::Application for AppModel {
                         notes.len()
                     );
                 }
-                self.notes = notes;
+                self.on_notes_updated(notes);
             }
 
             Message::LoadNotesFailed(msg) => eprint!("failed loading notes: {msg}"),
@@ -408,13 +377,24 @@ impl AppModel {
             Task::none()
         }
     }
-}
 
-/// The page to display in the application.
-pub enum Page {
-    Page1,
-    Page2,
-    Page3,
+    fn on_notes_updated(&mut self, notes: NotesCollection) {
+        self.notes = notes;
+        // Create a nav bar with three page items.
+        self.nav = Self::build_nav(&self.notes);
+    }
+
+    fn build_nav(notes: &NotesCollection) -> nav_bar::Model {
+        let mut nav = nav_bar::Model::default();
+        for note in notes {
+            nav.insert()
+                .text(note.1.get_title().to_string())
+                .data::<Uuid>(*note.0)
+                .icon(icon::from_name("applications-science-symbolic"));
+        }
+        nav.activate_position(0);
+        nav
+    }
 }
 
 /// The context page to display in the context drawer.
