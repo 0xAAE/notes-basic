@@ -96,6 +96,12 @@ impl NotesCollection {
         id
     }
 
+    pub fn get_style_or_default(&self, style_id: &Uuid) -> Option<&NoteStyle> {
+        self.styles
+            .get(style_id)
+            .or_else(|| self.styles.get(&self.default_style))
+    }
+
     fn ensure_default_style(&mut self) {
         // ensure default_style is correct
         if !self.styles.contains_key(&self.default_style) {

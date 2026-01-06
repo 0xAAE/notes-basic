@@ -6,11 +6,11 @@ use uuid::Uuid;
 pub struct NoteData {
     content: String,
     modified: DateTime<Utc>,
-    style: Uuid,
+    pub style: Uuid,
     position: (usize, usize),
     size: (usize, usize),
-    is_locked: bool,
-    is_visible: bool,
+    pub is_locked: bool,
+    pub is_visible: bool,
 }
 
 impl NoteData {
@@ -69,11 +69,19 @@ impl NoteData {
         self.modified.into()
     }
 
-    pub fn get_style(&self) -> &Uuid {
-        &self.style
+    pub fn left(&self) -> usize {
+        self.position.0
     }
 
-    pub fn set_style(&mut self, style: Uuid) {
-        self.style = style;
+    pub fn top(&self) -> usize {
+        self.position.1
+    }
+
+    pub fn width(&self) -> usize {
+        self.size.0
+    }
+
+    pub fn height(&self) -> usize {
+        self.size.1
     }
 }

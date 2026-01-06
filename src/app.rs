@@ -198,10 +198,12 @@ impl cosmic::Application for AppModel {
     ///
     /// Application events will be processed through the view. Any messages emitted by
     /// events received by widgets will be passed to the update method.
+    #[allow(clippy::too_many_lines)]
     fn view(&self) -> Element<'_, Self::Message> {
         let space_s = cosmic::theme::spacing().space_s;
         let page: Element<_> = if let Some(note_id) = self.nav.active_data::<Uuid>()
             && let Some(note) = self.notes.try_get_note(note_id)
+            && let Some(style) = self.notes.get_style_or_default(&note.style)
         {
             // caption
             let header = widget::row::with_capacity(2)
@@ -224,12 +226,57 @@ impl cosmic::Application for AppModel {
                 .align_y(Alignment::Start)
                 .push(widget::text::text(note.get_content()).height(Length::Fill));
             // info
-            let info = widget::row::with_capacity(2)
-                .align_y(Alignment::Center)
+            let info = widget::column::with_capacity(5)
+                .align_x(Alignment::Start)
                 .height(Length::Shrink)
-                .push(widget::text::text(note.get_modified().to_rfc2822()))
-                .spacing(space_s)
-                .push(widget::text::text(note_id.to_string()));
+                .push(
+                    widget::row::with_capacity(2)
+                        .height(Length::Shrink)
+                        .push(widget::text::text("id: "))
+                        .push(widget::text::text(note_id.to_string())),
+                )
+                .push(
+                    widget::row::with_capacity(2)
+                        .height(Length::Shrink)
+                        .push(widget::text::text("modified: "))
+                        .push(widget::text::text(note.get_modified().to_rfc2822())),
+                )
+                .push(
+                    widget::row::with_capacity(6)
+                        .height(Length::Shrink)
+                        .push(widget::text::text("style: "))
+                        .push(widget::text::text(&style.name))
+                        .push(widget::text::text(", font "))
+                        .push(widget::text::text(&style.font_name))
+                        .push(widget::text::text(", background "))
+                        .push(widget::text::text(format!("{:?}", style.bgcolor))),
+                )
+                .push(
+                    widget::row::with_capacity(4)
+                        .height(Length::Shrink)
+                        .push(widget::text::text("geometry: "))
+                        .push(widget::text::text(format!(
+                            "{}, {}",
+                            note.left(),
+                            note.top()
+                        )))
+                        .spacing(space_s)
+                        .push(widget::text::text("x"))
+                        .spacing(space_s)
+                        .push(widget::text::text(format!(
+                            "{}, {}",
+                            note.width(),
+                            note.height()
+                        ))),
+                )
+                .push(
+                    widget::row::with_capacity(4)
+                        .height(Length::Shrink)
+                        .push(widget::text::text("visible: "))
+                        .push(widget::text::text(format!("{}", note.is_visible)))
+                        .push(widget::text::text(" locked: "))
+                        .push(widget::text::text(format!("{}", note.is_locked))),
+                );
             // combine text + (optional) info into content
             let content = {
                 let mut content = widget::column::with_capacity(2).push(text);
