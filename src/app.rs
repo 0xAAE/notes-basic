@@ -435,18 +435,26 @@ impl AppModel {
         if let Some(text) = &self.editing {
             widget::column::with_capacity(2)
                 .align_x(Alignment::Start)
-                .push(widget::text_editor(text).on_action(Message::Edit))
-                .height(Length::Fill)
-                .push(widget::button::text("Save").on_press(Message::StopEditNote))
-                .height(Length::Shrink)
+                .push(
+                    widget::text_editor(text)
+                        .on_action(Message::Edit)
+                        .height(Length::Fill),
+                )
+                .push(
+                    widget::button::text("Save")
+                        .on_press(Message::StopEditNote)
+                        .height(Length::Shrink),
+                )
                 .into()
         } else {
             widget::column::with_capacity(2)
                 .align_x(Alignment::Start)
-                .push(widget::text::text(note.get_content()))
-                .height(Length::Fill)
-                .push(widget::button::text("Edit").on_press(Message::StartEditNote(*note_id)))
-                .height(Length::Shrink)
+                .push(widget::text::text(note.get_content()).height(Length::Fill))
+                .push(
+                    widget::button::text("Edit")
+                        .on_press(Message::StartEditNote(*note_id))
+                        .height(Length::Shrink),
+                )
                 .into()
         }
     }
