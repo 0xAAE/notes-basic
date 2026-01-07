@@ -39,6 +39,8 @@ pub struct AppModel {
     info_is_active: bool,
     /// Content itself
     notes: NotesCollection,
+    /// currentluy edited content
+    editing: Option<widget::text_editor::Content>,
 }
 
 /// Messages emitted by the application and its widgets.
@@ -49,9 +51,13 @@ pub enum Message {
     UpdateConfig(Config),
     ToggleInfo,
     WatchTick(u32),
-    //
+    // Loading notes collection
     LoadNotesCompleted(NotesCollection),
     LoadNotesFailed(String),
+    // Edit currently selected (displayed) note, contains id of the note
+    StartEditNote(Uuid),
+    StopEditNote,
+    Edit(widget::text_editor::Action),
 }
 
 /// Create a COSMIC application from the app model
@@ -116,6 +122,7 @@ impl cosmic::Application for AppModel {
             time: 0,
             info_is_active: false,
             notes,
+            editing: None,
         };
 
         // Create a startup commands
@@ -206,7 +213,8 @@ impl cosmic::Application for AppModel {
         {
             // combine text + (optional) info into content
             let content = {
-                let mut content = widget::column::with_capacity(2).push(Self::build_content(note));
+                let mut content =
+                    widget::column::with_capacity(2).push(self.build_content(note_id, note));
                 if self.info_is_active {
                     content = content
                         .spacing(space_s)
@@ -326,6 +334,20 @@ impl cosmic::Application for AppModel {
             Message::LoadNotesFailed(msg) => {
                 eprintln!("failed loading notes: {msg}");
             }
+
+            Message::StartEditNote(note_id) => {
+                self.on_start_edit(note_id);
+            }
+
+            Message::StopEditNote => {
+                self.on_finish_edit();
+            }
+
+            Message::Edit(action) => {
+                if let Some(content) = &mut self.editing {
+                    content.perform(action);
+                }
+            }
         }
         Task::none()
     }
@@ -354,6 +376,21 @@ impl AppModel {
         } else {
             Task::none()
         }
+    }
+
+    fn on_start_edit(&mut self, note_id: Uuid) {
+        if let Some(note) = self.notes.try_get_note(&note_id) {
+            self.editing = Some(widget::text_editor::Content::with_text(note.get_content()));
+        } else {
+            eprintln!("cancel editing: note {note_id} is not found");
+        }
+    }
+
+    fn on_finish_edit(&mut self) {
+        if let Some(text) = &self.editing {
+            eprintln!("text {} is unsaved", text.text());
+        }
+        self.editing = None;
     }
 
     fn on_notes_updated(&mut self, notes: NotesCollection) {
@@ -390,15 +427,28 @@ impl AppModel {
                 .on_press(Message::ToggleInfo)
                 .width(Length::Shrink),
             )
-            .spacing(space_s)
             .into()
     }
 
-    fn build_content(note: &NoteData) -> Element<'_, Message> {
-        widget::row::with_capacity(1)
-            .align_y(Alignment::Start)
-            .push(widget::text::text(note.get_content()).height(Length::Fill))
-            .into()
+    fn build_content<'a>(&'a self, note_id: &Uuid, note: &'a NoteData) -> Element<'a, Message> {
+        // read-only note
+        if let Some(text) = &self.editing {
+            widget::column::with_capacity(2)
+                .align_x(Alignment::Start)
+                .push(widget::text_editor(text).on_action(Message::Edit))
+                .height(Length::Fill)
+                .push(widget::button::text("Save").on_press(Message::StopEditNote))
+                .height(Length::Shrink)
+                .into()
+        } else {
+            widget::column::with_capacity(2)
+                .align_x(Alignment::Start)
+                .push(widget::text::text(note.get_content()))
+                .height(Length::Fill)
+                .push(widget::button::text("Edit").on_press(Message::StartEditNote(*note_id)))
+                .height(Length::Shrink)
+                .into()
+        }
     }
 
     fn build_info<'a>(
