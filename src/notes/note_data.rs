@@ -1,4 +1,7 @@
-use super::{DEF_NOTE_HEIGHT, DEF_NOTE_WIDTH, EMTPY_TITLE, MAX_TITLE_CHARS, NO_TITLE, import};
+use super::{
+    DEF_NOTE_HEIGHT, DEF_NOTE_WIDTH, EMTPY_TITLE, MAX_TITLE_CHARS, NO_TITLE,
+    indicator_stickynotes as import,
+};
 use chrono::{DateTime, Local, Utc};
 use uuid::Uuid;
 

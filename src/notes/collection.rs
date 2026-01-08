@@ -1,4 +1,4 @@
-use super::{NoteData, NoteStyle, import};
+use super::{NoteData, NoteStyle, indicator_stickynotes as import};
 use cosmic::{
     cosmic_theme::palette::{Hsv, convert::FromColorUnclamped as _, rgb::Rgb},
     iced::Color,
@@ -147,7 +147,7 @@ impl Drop for NotesCollection {
                 eprintln!(
                     "drop note {note_id} unsaved content: {}",
                     note.get_content()
-                )
+                );
             }
         });
     }

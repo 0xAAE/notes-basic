@@ -3,7 +3,7 @@ pub use note_data::NoteData;
 pub use note_style::NoteStyle;
 
 mod collection;
-mod import;
+mod indicator_stickynotes;
 mod note_data;
 mod note_style;
 
