@@ -4,7 +4,7 @@ use crate::config::Config;
 use crate::fl;
 use crate::notes::{INVISIBLE_TEXT, NoteData, NoteStyle, NotesCollection};
 use cosmic::app::context_drawer;
-use cosmic::cosmic_config::{self, CosmicConfigEntry};
+use cosmic::cosmic_config::{self, ConfigSet, CosmicConfigEntry};
 use cosmic::iced::{Alignment, Length, Subscription};
 use cosmic::widget::{self, about::About, icon, menu, nav_bar};
 use cosmic::{iced_futures, prelude::*};
@@ -131,7 +131,7 @@ impl cosmic::Application for AppModel {
         };
 
         // Create a startup commands
-        let data_file = if app.config.data_file.is_empty() {
+        let import_file = if app.config.import_file.is_empty() {
             dirs_next::home_dir()
                 .map(|mut home| {
                     home.push(DEF_DATA_FILE);
@@ -139,12 +139,12 @@ impl cosmic::Application for AppModel {
                 })
                 .unwrap_or_default()
         } else {
-            app.config.data_file.clone()
+            app.config.import_file.clone()
         };
         let commands = cosmic::task::batch(vec![
             app.update_title(),
             cosmic::task::future(async move {
-                let data_file_clone = data_file.clone();
+                let data_file_clone = import_file.clone();
                 match tokio::task::spawn_blocking(move || {
                     NotesCollection::try_import(data_file_clone)
                 })
@@ -154,13 +154,12 @@ impl cosmic::Application for AppModel {
                         Ok(v) => Message::LoadNotesCompleted(v),
                         Err(e) => {
                             let msg = format!(
-                                "failed reading notes from {}: {e}, {}",
-                                if data_file.is_empty() {
+                                "failed reading notes from {}: {e}",
+                                if import_file.is_empty() {
                                     "<empty>"
                                 } else {
-                                    data_file.as_str()
+                                    import_file.as_str()
                                 },
-                                e.source().map_or_else(String::new, ToString::to_string)
                             );
                             Message::LoadNotesFailed(msg)
                         }
@@ -362,6 +361,26 @@ impl cosmic::Application for AppModel {
         self.nav.activate(id);
 
         self.update_title()
+    }
+
+    fn on_app_exit(&mut self) -> Option<Self::Message> {
+        if self.notes.is_changed()
+            && let Ok(whole_config) = cosmic_config::Config::new(Self::APP_ID, Config::VERSION)
+        {
+            match self.notes.try_write() {
+                Ok(json) => {
+                    let tx = whole_config.transaction();
+                    if let Err(e) = tx.set("notes", json) {
+                        eprintln!("Failed updating notes in config: {e}");
+                    }
+                    if let Err(e) = tx.commit() {
+                        eprintln!("Failed saving config updated: {e}");
+                    }
+                }
+                Err(e) => eprintln!("failed serializing notes: {e}"),
+            }
+        }
+        None
     }
 }
 

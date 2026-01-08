@@ -1,4 +1,4 @@
-use chrono::{DateTime, Local, NaiveDateTime, TimeZone, Utc};
+use chrono::{DateTime, Local, NaiveDateTime, TimeZone};
 use serde::{Deserialize, Deserializer, Serializer, de::Error};
 use serde_json_fmt::JsonSyntaxError;
 use std::{collections::HashMap, io::Cursor, path::Path};
@@ -41,37 +41,32 @@ pub struct Note {
         deserialize_with = "deserialize_from_str",
         serialize_with = "serialize_to_str"
     )]
-    pub last_modified: DateTime<Utc>,
+    pub last_modified: DateTime<Local>,
     pub properties: NoteProperties,
     pub cat: Uuid,
 }
 
 const IMPORT_DATETIME_FORMAT: &str = "%Y-%m-%dT%H:%M:%S";
 
-fn deserialize_from_str<'de, D>(deserializer: D) -> Result<DateTime<Utc>, D::Error>
+fn deserialize_from_str<'de, D>(deserializer: D) -> Result<DateTime<Local>, D::Error>
 where
     D: Deserializer<'de>,
 {
     let s: String = Deserialize::deserialize(deserializer)?;
     let tmp =
         NaiveDateTime::parse_from_str(&s, IMPORT_DATETIME_FORMAT).map_err(D::Error::custom)?;
-    // try to assume as local time, otherwise assume as UTC time
-    Ok(Local.from_local_datetime(&tmp).single().map_or_else(
-        || DateTime::<Utc>::from_naive_utc_and_offset(tmp, Utc),
-        |local| local.with_timezone(&Utc),
-    ))
+    Ok(Local
+        .from_local_datetime(&tmp)
+        .single()
+        // if failed for some reason use local time
+        .unwrap_or_else(Local::now))
 }
 
-fn serialize_to_str<S>(value: &DateTime<Utc>, serializer: S) -> Result<S::Ok, S::Error>
+fn serialize_to_str<S>(value: &DateTime<Local>, serializer: S) -> Result<S::Ok, S::Error>
 where
     S: Serializer,
 {
-    serializer.serialize_str(
-        &value
-            .with_timezone(&Local)
-            .format(IMPORT_DATETIME_FORMAT)
-            .to_string(),
-    )
+    serializer.serialize_str(&value.format(IMPORT_DATETIME_FORMAT).to_string())
 }
 
 #[derive(serde::Deserialize, serde::Serialize, Debug, Clone, PartialEq)]
@@ -130,7 +125,7 @@ impl NotesDatabase {
 }
 
 #[test]
-fn import_end_export_local_sample() {
+fn import_end_export() {
     const INPUT_FILE: &str = "test_data/indicator-stickynotes";
 
     // read source file into buffer

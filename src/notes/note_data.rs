@@ -5,7 +5,7 @@ use super::{
 use chrono::{DateTime, Local, Utc};
 use uuid::Uuid;
 
-#[derive(Debug, Clone, Default)]
+#[derive(serde::Deserialize, serde::Serialize, Debug, Clone, Default, PartialEq)]
 pub struct NoteData {
     content: String,
     modified: DateTime<Utc>,
@@ -44,7 +44,7 @@ impl NoteData {
         };
         Self {
             content: src.body,
-            modified: src.last_modified,
+            modified: src.last_modified.into(),
             style: src.cat,
             position,
             size,
