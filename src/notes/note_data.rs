@@ -14,6 +14,7 @@ pub struct NoteData {
     size: (usize, usize),
     pub is_locked: bool,
     pub is_visible: bool,
+    #[serde(skip)]
     is_dirty: bool,
 }
 
@@ -99,5 +100,9 @@ impl NoteData {
 
     pub fn is_changed(&self) -> bool {
         self.is_dirty
+    }
+
+    pub fn commit(&mut self) {
+        self.is_dirty = false;
     }
 }

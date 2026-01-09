@@ -1,10 +1,11 @@
 use super::{
     NoteData, NoteStyle,
     indicator_stickynotes::{
-        CategoryProperties as ImportCategoryProperties, GlobalProperties as ImportGlobalProperties,
-        IndicatorStickyNotesError as ImportError, Note as ImportNote,
-        NoteProperties as ImportNoteProperties, NotesDatabase as ImportDatabase,
-        try_import_indicator_stickynotes,
+        CategoryProperties as StickyNotesCategoryProperties,
+        GlobalProperties as StickyNotesGlobalProperties,
+        IndicatorStickyNotesError as StickyNotesError, Note as StickyNotesNote,
+        NoteProperties as StickyNotesNoteProperties, NotesDatabase as StickyNotesDatabase,
+        try_export_indicator_stickynotes, try_import_indicator_stickynotes,
     },
 };
 use cosmic::{
@@ -22,7 +23,10 @@ use uuid::Uuid;
 pub enum NotesCollectionError {
     // Failed reading source file
     #[error("Failed importing notes: {0}")]
-    Import(ImportError),
+    Import(StickyNotesError),
+    // Failed writing export file
+    #[error("Failed iexporting notes: {0}")]
+    Export(StickyNotesError),
     // Failed parsing input text
     #[error("Failed parsing notes: {0}")]
     Json(serde_json::Error),
@@ -35,8 +39,8 @@ pub struct NotesCollection {
     default_style: Uuid,
 }
 
-impl From<ImportDatabase> for NotesCollection {
-    fn from(value: ImportDatabase) -> Self {
+impl From<StickyNotesDatabase> for NotesCollection {
+    fn from(value: StickyNotesDatabase) -> Self {
         // import notes data
         let notes = value
             .notes
@@ -84,16 +88,16 @@ impl From<ImportDatabase> for NotesCollection {
     }
 }
 
-impl From<&NotesCollection> for ImportDatabase {
-    fn from(value: &NotesCollection) -> Self {
+impl From<NotesCollection> for StickyNotesDatabase {
+    fn from(value: NotesCollection) -> Self {
         let notes = value
             .notes
-            .iter()
-            .map(|(note_id, note)| ImportNote {
-                uuid: *note_id,
+            .into_iter()
+            .map(|(note_id, note)| StickyNotesNote {
+                uuid: note_id,
                 body: note.get_content().to_string(),
                 last_modified: note.get_modified(),
-                properties: ImportNoteProperties {
+                properties: StickyNotesNoteProperties {
                     position: vec![note.left(), note.top()],
                     size: vec![note.width(), note.height()],
                     locked: note.is_locked,
@@ -103,12 +107,12 @@ impl From<&NotesCollection> for ImportDatabase {
             .collect();
         let categories = value
             .styles
-            .iter()
+            .into_iter()
             .map(|(style_id, style)| {
                 let hsv = Hsv::from_color_unclamped(Srgb::from(style.bgcolor));
                 (
-                    *style_id,
-                    ImportCategoryProperties {
+                    style_id,
+                    StickyNotesCategoryProperties {
                         name: style.name.clone(),
                         font: style.font_name.clone(),
                         bgcolor_hsv: vec![hsv.hue.into(), hsv.saturation, hsv.value],
@@ -116,9 +120,9 @@ impl From<&NotesCollection> for ImportDatabase {
                 )
             })
             .collect();
-        ImportDatabase {
+        StickyNotesDatabase {
             notes,
-            properties: ImportGlobalProperties {
+            properties: StickyNotesGlobalProperties {
                 // user always to view after export but can simply "hide all" with one click
                 all_visible: true,
                 default_cat: value.default_style,
@@ -136,6 +140,15 @@ impl NotesCollection {
             .await
             .map(Into::into)
             .map_err(NotesCollectionError::Import)
+    }
+
+    pub async fn try_export<P: AsRef<Path> + std::fmt::Debug>(
+        data_file: P,
+        notes: NotesCollection,
+    ) -> Result<(), NotesCollectionError> {
+        try_export_indicator_stickynotes(data_file, notes.into())
+            .await
+            .map_err(NotesCollectionError::Export)
     }
 
     pub fn try_read(input: &str) -> Result<Self, NotesCollectionError> {
@@ -160,6 +173,10 @@ impl NotesCollection {
 
     pub fn is_changed(&self) -> bool {
         self.notes.iter().any(|(_, note)| note.is_changed())
+    }
+
+    pub fn commit_changes(&mut self) {
+        self.notes.iter_mut().for_each(|(_, note)| note.commit());
     }
 
     pub fn len(&self) -> usize {

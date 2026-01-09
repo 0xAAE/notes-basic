@@ -29,8 +29,18 @@ pub enum IndicatorStickyNotesError {
 pub async fn try_import_indicator_stickynotes<P: AsRef<Path> + std::fmt::Debug>(
     data_file: P,
 ) -> Result<NotesDatabase, IndicatorStickyNotesError> {
-    let content = tokio::fs::read(&data_file).await?;
+    let content = tokio::fs::read(data_file).await?;
     NotesDatabase::try_import(&content)
+}
+
+pub async fn try_export_indicator_stickynotes<P: AsRef<Path> + std::fmt::Debug>(
+    data_file: P,
+    data_base: NotesDatabase,
+) -> Result<(), IndicatorStickyNotesError> {
+    let content = data_base.try_export()?;
+    tokio::fs::write(data_file, content)
+        .await
+        .map_err(IndicatorStickyNotesError::Io)
 }
 
 #[derive(serde::Deserialize, serde::Serialize, Debug, Clone, PartialEq)]
