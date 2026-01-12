@@ -226,15 +226,19 @@ impl cosmic::Application for AppModel {
                     }
                 }))
                 .center_x(Length::Fill)
-                .center_y(Length::Fill);
+                .center_y(Length::Fill)
+                .padding(cosmic::theme::spacing().space_s);
 
-            let focused = self
-                .core()
-                .focused_window()
-                .map(|i| i == id)
-                .unwrap_or(false);
+            // to display header bar above content:
+            // let focused = self
+            //     .core()
+            //     .focused_window()
+            //     .map(|i| i == id)
+            //     .unwrap_or(false);
+            // column![widget::header_bar().focused(focused), window_content].into()
 
-            column![widget::header_bar().focused(focused), window_content].into()
+            // display only content without header bar:
+            column![window_content].into()
         } else {
             Self::build_undesired_view()
         }
@@ -509,6 +513,7 @@ impl AppModel {
                     note.top() as f32,
                 )),
                 size: Size::new(note.width() as f32, note.height() as f32),
+                decorations: false,
                 ..Default::default()
             });
             note.assign_window(id);
