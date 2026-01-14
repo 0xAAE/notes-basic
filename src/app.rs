@@ -6,7 +6,6 @@ use std::ops::Not;
 use crate::config::Config;
 use crate::fl;
 use crate::notes::{INVISIBLE_TEXT, NoteData, NoteStyle, NotesCollection};
-use cosmic::iced::window::Position;
 use cosmic::prelude::*;
 use cosmic::{
     cosmic_config::{self, ConfigSet, CosmicConfigEntry},
@@ -15,9 +14,9 @@ use cosmic::{
         core::mouse::Button as MouseButton,
         event::Status as EventStatus,
         mouse::Event as MouseEvent,
-        widget::column,
         widget::container as iced_container,
-        window::{self, Event as WindowEvent, Id},
+        widget::{column, row},
+        window::{self, Event as WindowEvent, Id, Position},
     },
     style,
     widget::{self, about::About, menu},
@@ -27,6 +26,14 @@ use uuid::Uuid;
 const REPOSITORY: &str = env!("CARGO_PKG_REPOSITORY");
 const APP_ICON: &[u8] = include_bytes!("../resources/icons/hicolor/scalable/apps/icon.svg");
 const DEF_DATA_FILE: &str = ".config/indicator-stickynotes";
+
+const ICON_UNLOCKED: &str = "resources/icons/hicolor/scalable/changes-allow-symbolic.svg";
+const ICON_LOCKED: &str = "resources/icons/hicolor/scalable/changes-prevent-symbolic.svg";
+const ICON_NEW: &str = "resources/icons/hicolor/scalable/document-new-symbolic.svg";
+const ICON_DELETE: &str = "resources/icons/hicolor/scalable/edit-delete-symbolic.svg";
+const ICON_EDIT: &str = "resources/icons/hicolor/scalable/edit-symbolic.svg";
+const ICON_DOWN: &str = "resources/icons/hicolor/scalable/pan-down-symbolic.svg";
+const ICON_PIN: &str = "resources/icons/hicolor/scalable/pin-symbolic.svg";
 
 /// The application model stores app-specific state used to describe its interface and
 /// drive its logic.
@@ -86,6 +93,13 @@ pub enum Message {
     AppMouseEvent((Id, MouseEvent)),
     // response on window::get_position() request
     WindowPositionResponse((Id, Option<Point>)),
+    // note image button actions
+    NoteLock(Id, bool),
+    NotePin(Id, bool),
+    NoteEdit(Id, bool),
+    NoteColor(Id),
+    NoteNew,
+    NoteDelete(Id),
 }
 
 /// Create a COSMIC application from the app model
@@ -199,11 +213,7 @@ impl cosmic::Application for AppModel {
     /// Application events will be processed through the view. Any messages emitted by
     /// events received by widgets will be passed to the update method.
     fn view(&self) -> Element<'_, Self::Message> {
-        if let Some(id) = self.core().main_window_id() {
-            self.view_window(id)
-        } else {
-            Self::build_undesired_view()
-        }
+        Self::build_undesired_view()
     }
 
     /// Constructs views for other windows.
@@ -213,12 +223,60 @@ impl cosmic::Application for AppModel {
                 .notes
                 .try_get_note_style(window_context.note_id)
                 .map(|style| style.bgcolor);
-            let note_content = widget::column::with_capacity(1)
+
+            const BUTTON_WIDTH: u16 = 32;
+
+            let lock = widget::icon::from_path(ICON_UNLOCKED.into());
+            let pin = widget::icon::from_path(ICON_PIN.into());
+            let edit = widget::icon::from_path(ICON_EDIT.into());
+            let down = widget::icon::from_path(ICON_DOWN.into());
+            let create = widget::icon::from_path(ICON_NEW.into());
+            let delete = widget::icon::from_path(ICON_DELETE.into());
+
+            let note_toolbar = widget::row::with_capacity(7)
+                .spacing(cosmic::theme::spacing().space_s)
+                .push(
+                    lock.apply(widget::button::icon)
+                        .on_press(Message::NoteLock(id, true))
+                        .width(Length::Shrink),
+                )
+                .push(
+                    pin.apply(widget::button::icon)
+                        .on_press(Message::NotePin(id, true))
+                        .width(Length::Shrink),
+                )
+                .push(
+                    edit.apply(widget::button::icon)
+                        .on_press(Message::NoteEdit(id, true))
+                        .width(Length::Shrink),
+                )
+                .push(
+                    down.apply(widget::button::icon)
+                        .on_press(Message::NoteColor(id))
+                        .width(Length::Shrink),
+                )
+                .push(
+                    create
+                        .apply(widget::button::icon)
+                        .on_press(Message::NoteNew)
+                        .width(Length::Shrink),
+                )
+                .push(widget::horizontal_space().width(Length::Fill))
+                .push(
+                    delete
+                        .apply(widget::button::icon)
+                        .on_press(Message::NoteDelete(id))
+                        .width(Length::Shrink),
+                );
+
+            let note_content = widget::column::with_capacity(2)
                 .width(Length::Fill)
                 .height(Length::Fill)
                 .push(widget::text(&window_context.content));
 
-            let window_content = widget::container(note_content)
+            let window_interior = column![note_toolbar, note_content];
+
+            let window_content = widget::container(window_interior)
                 .class(style::Container::custom(move |theme: &Theme| {
                     let cosmic = theme.cosmic();
                     iced_container::Style {
@@ -405,6 +463,37 @@ impl cosmic::Application for AppModel {
                 {
                     note.set_position(point.x as usize, point.y as usize);
                 }
+            }
+
+            Message::NoteLock(id, is_on) => {
+                println!("{id}: {}", if is_on { "lock note" } else { "unlock note" });
+            }
+
+            Message::NotePin(id, is_on) => {
+                println!("{id}: {}", if is_on { "pin note" } else { "unpin note" });
+            }
+
+            Message::NoteEdit(id, is_on) => {
+                println!(
+                    "{id}: {}",
+                    if is_on {
+                        "begin edit note"
+                    } else {
+                        "stop edit and save note"
+                    }
+                );
+            }
+
+            Message::NoteColor(id) => {
+                println!("{id}: change style");
+            }
+
+            Message::NoteNew => {
+                println!("new note");
+            }
+
+            Message::NoteDelete(id) => {
+                println!("{id}: delete note");
             }
         }
         Task::none()
