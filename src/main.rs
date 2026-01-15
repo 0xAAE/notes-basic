@@ -3,6 +3,7 @@
 mod app;
 mod config;
 mod i18n;
+mod icons;
 #[allow(dead_code)]
 mod notes;
 

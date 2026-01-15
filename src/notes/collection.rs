@@ -103,7 +103,7 @@ impl From<NotesCollection> for StickyNotesDatabase {
                 properties: StickyNotesNoteProperties {
                     position: vec![note.left(), note.top()],
                     size: vec![note.width(), note.height()],
-                    locked: note.is_locked,
+                    locked: note.is_locked(),
                 },
                 cat: note.style,
             })

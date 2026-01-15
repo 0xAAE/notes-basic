@@ -5,6 +5,7 @@ use std::ops::Not;
 
 use crate::config::Config;
 use crate::fl;
+use crate::icons;
 use crate::notes::{INVISIBLE_TEXT, NoteData, NotesCollection};
 use cosmic::prelude::*;
 use cosmic::{
@@ -38,28 +39,6 @@ const fn to_usize(v: f32) -> usize {
 const fn to_f32(v: usize) -> f32 {
     v as f32
 }
-// embedded SVG bytes
-const ICON_UNLOCKED: &[u8] =
-    include_bytes!("../resources/icons/hicolor/scalable/changes-allow-symbolic.svg");
-const ICON_LOCKED: &[u8] =
-    include_bytes!("../resources/icons/hicolor/scalable/changes-prevent-symbolic.svg");
-const ICON_NEW: &[u8] =
-    include_bytes!("../resources/icons/hicolor/scalable/document-new-symbolic.svg");
-const ICON_DELETE: &[u8] =
-    include_bytes!("../resources/icons/hicolor/scalable/edit-delete-symbolic.svg");
-const ICON_EDIT: &[u8] = include_bytes!("../resources/icons/hicolor/scalable/edit-symbolic.svg");
-const ICON_DOWN: &[u8] =
-    include_bytes!("../resources/icons/hicolor/scalable/pan-down-symbolic.svg");
-const ICON_PIN: &[u8] = include_bytes!("../resources/icons/hicolor/scalable/pin-symbolic.svg");
-
-// // system wide installed icons
-// const XDG_UNLOCKED: &str = "changes-allow-symbolic";
-// const XDG_LOCKED: &str = "changes-prevent-symbolic";
-// const XDG_NEW: &str = "document-new-symbolic";
-// const XDG_DELETE: &str = "edit-delete-symbolic";
-// const XDG_EDIT: &str = "edit-symbolic";
-// const XDG_DOWN: &str = "pan-down-symbolic";
-// const XDG_PIN: &str = "pin-symbolic";
 
 /// The application model stores app-specific state used to describe its interface and
 /// drive its logic.
@@ -78,6 +57,10 @@ pub struct AppModel {
     /// windows by ID
     windows: HashMap<Id, WindowContext>,
     cursor_window: Option<Id>,
+    #[cfg(not(feature = "xdg_icons"))]
+    icons: icons::IconSet,
+    #[cfg(feature = "xdg_icons")]
+    icons: icons::IconSet,
 }
 
 struct WindowContext {
@@ -116,11 +99,11 @@ pub enum Message {
     WindowPositionResponse((Id, Option<Point>)),
     // note image button actions
     NoteLock(Id, bool), // lock / unlock note
-    NotePin(Id, bool), // pin / unpin sticky window
+    NotePin(Id, bool),  // pin / unpin sticky window
     NoteEdit(Id, bool), // edit / save note content
-    NoteColor(Id), // select style (background, font) for sticky window
-    NoteNew, // create new note with default syle and begin edit
-    NoteDelete(Id), // delete note
+    NoteColor(Id),      // select style (background, font) for sticky window
+    NoteNew,            // create new note with default syle and begin edit
+    NoteDelete(Id),     // delete note
 }
 
 /// Create a COSMIC application from the app model
@@ -177,6 +160,7 @@ impl cosmic::Application for AppModel {
             editing: None,
             windows: HashMap::new(),
             cursor_window: None,
+            icons: icons::IconSet::new(),
         };
 
         // Create a startup commands: spawn note windows and (optionally) import indicator-stickynotes data
@@ -554,11 +538,9 @@ impl AppModel {
     fn on_change_note_locking(&mut self, window_id: Id, is_on: bool) {
         if let Some(note) = self.try_get_note_mut(window_id) {
             if is_on {
-                println!("{window_id}: lock note");
-                note.is_locked = true;
+                note.set_locking(true);
             } else {
-                println!("{window_id}: unlock note");
-                note.is_locked = false;
+                note.set_locking(false);
             }
         } else {
             println!("{window_id}: note is not found to change locking");
@@ -687,54 +669,51 @@ impl AppModel {
         id: Id,
         window_context: &WindowContext,
     ) -> Element<'a, Message> {
-        // using embedded SVG icons
         let note_toolbar = if self.editing.is_none() {
-            // using embedded SVG icons
-            let lock = widget::icon::from_svg_bytes(ICON_UNLOCKED);
-            let _unlock = widget::icon::from_svg_bytes(ICON_LOCKED);
-            let pin = widget::icon::from_svg_bytes(ICON_PIN);
-            let edit = widget::icon::from_svg_bytes(ICON_EDIT);
-            let down = widget::icon::from_svg_bytes(ICON_DOWN);
-            let create = widget::icon::from_svg_bytes(ICON_NEW);
-            let delete = widget::icon::from_svg_bytes(ICON_DELETE);
-
-            // or using system XDG icons by names
-            // let lock = widget::icon::from_name(XDG_UNLOCKED);
-            // let _unlock = widget::icon::from_name(XDG_LOCKED);
-            // let pin = widget::icon::from_name(XDG_PIN);
-            // let edit = widget::icon::from_name(XDG_EDIT);
-            // let down = widget::icon::from_name(XDG_DOWN);
-            // let create = widget::icon::from_name(XDG_NEW);
-            // let delete = widget::icon::from_name(XDG_DELETE);
-
+            let is_locked = self
+                .notes
+                .try_get_note(&window_context.note_id)
+                .is_some_and(NoteData::is_locked);
             widget::row::with_capacity(7)
                 .spacing(cosmic::theme::spacing().space_s)
                 .push(
-                    lock.apply(widget::button::icon)
-                        .icon_size(ICON_SIZE)
-                        .on_press(Message::NoteLock(id, true))
-                        .width(Length::Shrink),
+                    if is_locked {
+                        self.icons.unlock()
+                    } else {
+                        self.icons.lock()
+                    }
+                    .apply(widget::button::icon)
+                    .icon_size(ICON_SIZE)
+                    .on_press(Message::NoteLock(id, !is_locked))
+                    .width(Length::Shrink),
                 )
                 .push(
-                    pin.apply(widget::button::icon)
+                    self.icons
+                        .pin()
+                        .apply(widget::button::icon)
                         .icon_size(ICON_SIZE)
                         .on_press(Message::NotePin(id, true))
                         .width(Length::Shrink),
                 )
                 .push(
-                    edit.apply(widget::button::icon)
+                    self.icons
+                        .edit()
+                        .apply(widget::button::icon)
                         .icon_size(ICON_SIZE)
                         .on_press(Message::NoteEdit(id, true))
                         .width(Length::Shrink),
                 )
                 .push(
-                    down.apply(widget::button::icon)
+                    self.icons
+                        .down()
+                        .apply(widget::button::icon)
                         .icon_size(ICON_SIZE)
                         .on_press(Message::NoteColor(id))
                         .width(Length::Shrink),
                 )
                 .push(
-                    create
+                    self.icons
+                        .create()
                         .apply(widget::button::icon)
                         .icon_size(ICON_SIZE)
                         .on_press(Message::NoteNew)
@@ -742,17 +721,18 @@ impl AppModel {
                 )
                 .push(widget::horizontal_space().width(Length::Fill))
                 .push(
-                    delete
+                    self.icons
+                        .delete()
                         .apply(widget::button::icon)
                         .icon_size(ICON_SIZE)
                         .on_press(Message::NoteDelete(id))
                         .width(Length::Shrink),
                 )
         } else {
-            let edit = widget::icon::from_svg_bytes(ICON_EDIT);
-
             widget::row::with_capacity(1).push(
-                edit.apply(widget::button::icon)
+                self.icons
+                    .edit()
+                    .apply(widget::button::icon)
                     .icon_size(ICON_SIZE)
                     .on_press(Message::NoteEdit(id, false))
                     .width(Length::Shrink),

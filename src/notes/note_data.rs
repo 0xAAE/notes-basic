@@ -13,8 +13,8 @@ pub struct NoteData {
     pub style: Uuid,
     position: (usize, usize),
     size: (usize, usize),
-    pub is_locked: bool,
-    pub is_visible: bool,
+    is_locked: bool,
+    is_visible: bool,
     #[serde(skip)]
     is_dirty: bool,
     #[serde(skip)]
@@ -113,6 +113,28 @@ impl NoteData {
     pub fn set_size(&mut self, width: usize, height: usize) {
         if self.size != (width, height) {
             self.size = (width, height);
+            self.is_dirty = true;
+        }
+    }
+
+    pub fn is_locked(&self) -> bool {
+        self.is_locked
+    }
+
+    pub fn set_locking(&mut self, on: bool) {
+        if self.is_locked != on {
+            self.is_locked = on;
+            self.is_dirty = true;
+        }
+    }
+
+    pub fn is_visible(&self) -> bool {
+        self.is_visible
+    }
+
+    pub fn set_visibility(&mut self, on: bool) {
+        if self.is_visible != on {
+            self.is_visible = on;
             self.is_dirty = true;
         }
     }
