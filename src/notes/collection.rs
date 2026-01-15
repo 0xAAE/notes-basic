@@ -1,3 +1,11 @@
+use std::{
+    collections::{
+        HashMap,
+        hash_map::{Iter, IterMut},
+    },
+    path::Path,
+};
+
 use super::{
     NoteData, NoteStyle,
     indicator_stickynotes::{
@@ -11,13 +19,6 @@ use super::{
 use cosmic::{
     cosmic_theme::palette::{Hsv, Srgb, convert::FromColorUnclamped as _, rgb::Rgb},
     iced::Color,
-};
-use std::{
-    collections::{
-        HashMap,
-        hash_map::{Iter, IterMut},
-    },
-    path::Path,
 };
 use thiserror::Error;
 use uuid::Uuid;
@@ -40,6 +41,10 @@ pub struct NotesCollection {
     notes: HashMap<Uuid, NoteData>,
     styles: HashMap<Uuid, NoteStyle>,
     default_style: Uuid,
+    #[serde(skip)]
+    is_dirty: bool,
+    #[serde[skip]]
+    deleted_notes: HashMap<Uuid, NoteData>,
 }
 
 impl From<StickyNotesDatabase> for NotesCollection {
@@ -84,6 +89,8 @@ impl From<StickyNotesDatabase> for NotesCollection {
             notes,
             styles,
             default_style: value.properties.default_cat,
+            is_dirty: true,                // not saved yet
+            deleted_notes: HashMap::new(), // no deleted yet
         };
         // ensure default_style is correct
         instance.ensure_default_style();
@@ -175,11 +182,12 @@ impl NotesCollection {
     }
 
     pub fn is_changed(&self) -> bool {
-        self.notes.iter().any(|(_, note)| note.is_changed())
+        self.is_dirty || self.notes.iter().any(|(_, note)| note.is_changed())
     }
 
     pub fn commit_changes(&mut self) {
-        self.notes.iter_mut().for_each(|(_, note)| note.commit());
+        self.notes.values_mut().for_each(NoteData::commit);
+        self.is_dirty = false;
     }
 
     pub fn len(&self) -> usize {
@@ -194,10 +202,35 @@ impl NotesCollection {
         self.notes.iter_mut()
     }
 
+    pub fn get_all_styles(&self) -> Iter<'_, Uuid, NoteStyle> {
+        self.styles.iter()
+    }
+
     pub fn new_note(&mut self) -> Uuid {
         let id = Uuid::new_v4();
         self.notes.insert(id, NoteData::new(self.default_style));
         id
+    }
+
+    pub fn delete_note(&mut self, note_id: Uuid) {
+        if let Some((id, note)) = self.notes.remove_entry(&note_id) {
+            self.is_dirty = true;
+            self.deleted_notes.insert(id, note);
+        }
+    }
+
+    pub fn get_all_deleted_notes(&self) -> Iter<'_, Uuid, NoteData> {
+        self.deleted_notes.iter()
+    }
+
+    pub fn restore_deleted_note(&mut self, note_id: Uuid) -> bool {
+        if let Some((id, note)) = self.deleted_notes.remove_entry(&note_id) {
+            self.is_dirty = true;
+            self.notes.insert(id, note);
+            true
+        } else {
+            false
+        }
     }
 
     pub fn get_style_or_default(&self, style_id: &Uuid) -> Option<&NoteStyle> {
@@ -229,8 +262,8 @@ impl NotesCollection {
                 .keys()
                 .next()
                 .copied()
-                // unwrap() also is safe here:
-                .unwrap_or_else(Uuid::new_v4);
+                // unwrap() also is safe enough here:
+                .unwrap_or_else(Uuid::nil);
         }
     }
 }
@@ -246,6 +279,8 @@ impl Default for NotesCollection {
             notes,
             styles,
             default_style,
+            is_dirty: false,
+            deleted_notes: HashMap::new(),
         }
     }
 }
@@ -269,5 +304,65 @@ async fn write_and_read_json() {
     let result = NotesCollection::try_read(&json).expect("deserialize notes must succeed");
 
     // compare collections
-    assert_eq!(expected, result);
+    assert_eq!(expected.len(), result.len());
+    assert_eq!(
+        expected.get_all_deleted_notes().count(),
+        result.get_all_deleted_notes().count()
+    );
+    assert_eq!(
+        expected.get_all_notes().count(),
+        result.get_all_notes().count()
+    );
+    assert_eq!(
+        expected.get_all_styles().count(),
+        result.get_all_styles().count()
+    );
+    assert_eq!(expected.default_style, result.default_style);
+}
+
+#[test]
+fn create_read_update_delete_restore_operations() {
+    let mut collection = NotesCollection::default();
+    // initial note was automatically created
+    assert_eq!(collection.len(), 1);
+    // create note
+    let note_id = collection.new_note();
+    assert_eq!(collection.len(), 2);
+    // get mutable ref to note
+    let note_mut = collection.try_get_note_mut(&note_id);
+    assert!(note_mut.is_some());
+    let note_mut = note_mut.unwrap();
+    // note is not changed
+    assert!(!note_mut.is_changed());
+    // set new text
+    note_mut.set_content("test text".to_string());
+    // note is changed
+    assert!(note_mut.is_changed());
+    // fix note changes
+    note_mut.commit();
+    // note is not changed again
+    assert!(!note_mut.is_changed());
+    // no deleted notes by default
+    assert_eq!(collection.get_all_deleted_notes().count(), 0);
+    // delete note
+    collection.delete_note(note_id);
+    // collection is changed
+    assert!(collection.is_changed());
+    // fix note changes
+    collection.commit_changes();
+    // collection is not changed
+    assert!(!collection.is_changed());
+    // can restore deleted note
+    assert_eq!(collection.get_all_deleted_notes().count(), 1);
+    // restore note
+    let result = collection.restore_deleted_note(note_id);
+    assert!(result);
+    // collection is changed
+    assert!(collection.is_changed());
+    // no more notes to restore
+    assert_eq!(collection.get_all_deleted_notes().count(), 0);
+    // fix note changes
+    collection.commit_changes();
+    // collection is not changed
+    assert!(!collection.is_changed());
 }

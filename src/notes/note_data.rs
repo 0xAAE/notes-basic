@@ -3,7 +3,6 @@ use super::{
     indicator_stickynotes as import,
 };
 use chrono::{DateTime, Local, Utc};
-use cosmic::iced::window::Id;
 use uuid::Uuid;
 
 #[derive(serde::Deserialize, serde::Serialize, Debug, Clone, Default, PartialEq)]
@@ -17,8 +16,6 @@ pub struct NoteData {
     is_visible: bool,
     #[serde(skip)]
     is_dirty: bool,
-    #[serde(skip)]
-    window_id: Option<Id>,
 }
 
 impl NoteData {
@@ -32,7 +29,6 @@ impl NoteData {
             is_locked: false,
             is_visible: true,
             is_dirty: false,
-            window_id: None,
         }
     }
 
@@ -56,7 +52,6 @@ impl NoteData {
             is_locked: src.properties.locked,
             is_visible,
             is_dirty: false,
-            window_id: None,
         }
     }
 
@@ -145,13 +140,5 @@ impl NoteData {
 
     pub fn commit(&mut self) {
         self.is_dirty = false;
-    }
-
-    pub fn assign_window(&mut self, window_id: Id) {
-        self.window_id = Some(window_id);
-    }
-
-    pub fn try_get_window_id(&self) -> Option<Id> {
-        self.window_id
     }
 }

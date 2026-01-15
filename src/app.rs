@@ -3,10 +3,11 @@
 use std::collections::HashMap;
 use std::ops::Not;
 
-use crate::config::Config;
-use crate::fl;
-use crate::icons;
-use crate::notes::{INVISIBLE_TEXT, NoteData, NotesCollection};
+use crate::{
+    config::Config,
+    fl, icons,
+    notes::{INVISIBLE_TEXT, NoteData, NotesCollection},
+};
 use cosmic::prelude::*;
 use cosmic::{
     cosmic_config::{self, ConfigSet, CosmicConfigEntry},
@@ -410,7 +411,7 @@ impl cosmic::Application for AppModel {
             }
 
             Message::NoteDelete(id) => {
-                println!("{id}: delete note");
+                return self.on_delete_note(id);
             }
         }
         Task::none()
@@ -420,7 +421,11 @@ impl cosmic::Application for AppModel {
         if self.notes.is_changed()
             && let Err(e) = self.save_notes()
         {
-            eprint!("Failed saving notes on exit: {e}");
+            eprintln!("Failed saving notes on exit: {e}");
+        }
+        let count_deleted = self.notes.get_all_deleted_notes().count();
+        if count_deleted > 0 {
+            println!("Finally drop deleted notes on exit: {count_deleted}");
         }
         None
     }
@@ -574,6 +579,15 @@ impl AppModel {
         }
     }
 
+    fn on_delete_note(&mut self, id: Id) -> Task<cosmic::Action<Message>> {
+        if let Some(context) = self.windows.remove(&id) {
+            self.notes.delete_note(context.note_id);
+            window::close(id)
+        } else {
+            Task::none()
+        }
+    }
+
     fn on_mouse_event(
         &mut self,
         id: Id,
@@ -648,7 +662,6 @@ impl AppModel {
             decorations: false,
             ..Default::default()
         });
-        note.assign_window(id);
         let note_id = *note_id;
         (
             id,
@@ -674,7 +687,7 @@ impl AppModel {
                 .notes
                 .try_get_note(&window_context.note_id)
                 .is_some_and(NoteData::is_locked);
-            widget::row::with_capacity(7)
+            let mut note_toolbar = widget::row::with_capacity(7)
                 .spacing(cosmic::theme::spacing().space_s)
                 .push(
                     if is_locked {
@@ -694,40 +707,47 @@ impl AppModel {
                         .icon_size(ICON_SIZE)
                         .on_press(Message::NotePin(id, true))
                         .width(Length::Shrink),
-                )
-                .push(
-                    self.icons
-                        .edit()
-                        .apply(widget::button::icon)
-                        .icon_size(ICON_SIZE)
-                        .on_press(Message::NoteEdit(id, true))
-                        .width(Length::Shrink),
-                )
-                .push(
-                    self.icons
-                        .down()
-                        .apply(widget::button::icon)
-                        .icon_size(ICON_SIZE)
-                        .on_press(Message::NoteColor(id))
-                        .width(Length::Shrink),
-                )
-                .push(
-                    self.icons
-                        .create()
-                        .apply(widget::button::icon)
-                        .icon_size(ICON_SIZE)
-                        .on_press(Message::NoteNew)
-                        .width(Length::Shrink),
-                )
-                .push(widget::horizontal_space().width(Length::Fill))
-                .push(
-                    self.icons
-                        .delete()
-                        .apply(widget::button::icon)
-                        .icon_size(ICON_SIZE)
-                        .on_press(Message::NoteDelete(id))
-                        .width(Length::Shrink),
-                )
+                );
+            if !is_locked {
+                note_toolbar = note_toolbar
+                    .push(
+                        self.icons
+                            .edit()
+                            .apply(widget::button::icon)
+                            .icon_size(ICON_SIZE)
+                            .on_press(Message::NoteEdit(id, true))
+                            .width(Length::Shrink),
+                    )
+                    .push(
+                        self.icons
+                            .down()
+                            .apply(widget::button::icon)
+                            .icon_size(ICON_SIZE)
+                            .on_press(Message::NoteColor(id))
+                            .width(Length::Shrink),
+                    );
+            }
+            note_toolbar = note_toolbar.push(
+                self.icons
+                    .create()
+                    .apply(widget::button::icon)
+                    .icon_size(ICON_SIZE)
+                    .on_press(Message::NoteNew)
+                    .width(Length::Shrink),
+            );
+            if !is_locked {
+                note_toolbar = note_toolbar
+                    .push(widget::horizontal_space().width(Length::Fill))
+                    .push(
+                        self.icons
+                            .delete()
+                            .apply(widget::button::icon)
+                            .icon_size(ICON_SIZE)
+                            .on_press(Message::NoteDelete(id))
+                            .width(Length::Shrink),
+                    );
+            }
+            note_toolbar
         } else {
             widget::row::with_capacity(1).push(
                 self.icons
