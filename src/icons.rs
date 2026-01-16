@@ -15,12 +15,10 @@ pub mod inner {
         include_bytes!("../resources/icons/hicolor/scalable/edit-symbolic.svg");
     const ICON_DOWN: &[u8] =
         include_bytes!("../resources/icons/hicolor/scalable/pan-down-symbolic.svg");
-    const ICON_PIN: &[u8] = include_bytes!("../resources/icons/hicolor/scalable/pin-symbolic.svg");
 
     pub struct IconSet {
         lock: Handle,
         unlock: Handle,
-        pin: Handle,
         edit: Handle,
         down: Handle,
         create: Handle,
@@ -32,7 +30,6 @@ pub mod inner {
             Self {
                 lock: icon::from_svg_bytes(ICON_UNLOCKED),
                 unlock: icon::from_svg_bytes(ICON_LOCKED),
-                pin: icon::from_svg_bytes(ICON_PIN),
                 edit: icon::from_svg_bytes(ICON_EDIT),
                 down: icon::from_svg_bytes(ICON_DOWN),
                 create: icon::from_svg_bytes(ICON_NEW),
@@ -46,10 +43,6 @@ pub mod inner {
 
         pub fn unlock(&self) -> Handle {
             self.unlock.clone()
-        }
-
-        pub fn pin(&self) -> Handle {
-            self.pin.clone()
         }
 
         pub fn edit(&self) -> Handle {
@@ -81,12 +74,10 @@ mod inner {
     pub const XDG_DELETE: &str = "edit-delete-symbolic";
     pub const XDG_EDIT: &str = "edit-symbolic";
     pub const XDG_DOWN: &str = "pan-down-symbolic";
-    pub const XDG_PIN: &str = "pin-symbolic";
 
     pub struct IconSet {
         lock: Named,
         unlock: Named,
-        pin: Named,
         edit: Named,
         down: Named,
         create: Named,
@@ -98,7 +89,6 @@ mod inner {
             Self {
                 lock: icon::from_name(XDG_UNLOCKED),
                 unlock: icon::from_name(XDG_LOCKED),
-                pin: icon::from_name(XDG_PIN),
                 edit: icon::from_name(XDG_EDIT),
                 down: icon::from_name(XDG_DOWN),
                 create: icon::from_name(XDG_NEW),
@@ -112,10 +102,6 @@ mod inner {
 
         pub fn unlock(&self) -> Handle {
             self.unlock.clone().into()
-        }
-
-        pub fn pin(&self) -> Handle {
-            self.pin.clone().into()
         }
 
         pub fn edit(&self) -> Handle {

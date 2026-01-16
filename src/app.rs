@@ -100,7 +100,6 @@ pub enum Message {
     WindowPositionResponse((Id, Option<Point>)),
     // note image button actions
     NoteLock(Id, bool), // lock / unlock note
-    NotePin(Id, bool),  // pin / unpin sticky window
     NoteEdit(Id, bool), // edit / save note content
     NoteColor(Id),      // select style (background, font) for sticky window
     NoteNew,            // create new note with default syle and begin edit
@@ -384,10 +383,6 @@ impl cosmic::Application for AppModel {
 
             Message::NoteLock(id, is_on) => {
                 self.on_change_note_locking(id, is_on);
-            }
-
-            Message::NotePin(id, is_on) => {
-                println!("{id}: {}", if is_on { "pin note" } else { "unpin note" });
             }
 
             Message::NoteEdit(id, is_on) => {
@@ -699,14 +694,6 @@ impl AppModel {
                     .icon_size(ICON_SIZE)
                     .on_press(Message::NoteLock(id, !is_locked))
                     .width(Length::Shrink),
-                )
-                .push(
-                    self.icons
-                        .pin()
-                        .apply(widget::button::icon)
-                        .icon_size(ICON_SIZE)
-                        .on_press(Message::NotePin(id, true))
-                        .width(Length::Shrink),
                 );
             if !is_locked {
                 note_toolbar = note_toolbar
