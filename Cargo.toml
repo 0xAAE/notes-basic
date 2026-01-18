@@ -6,6 +6,11 @@ license = "MPL-2.0"
 description = "BAsic implementation of sticky notes"
 repository = "https://github.com/0xAAE/notes-basic"
 
+[features]
+default = []
+# to not embed svg files into binary and use XDG system-wide icons instead:
+xdg_icons = []
+
 [dependencies]
 anyhow = "1.0"
 chrono = { version = "0.4", features = [ "serde" ] }
