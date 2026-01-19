@@ -83,6 +83,8 @@ pub enum Message {
     SaveNotes,
     ImportNotes,
     ExportNotes,
+    SetAllVisible(bool), // on / off
+    // settings actions
     SetDefaultStyle(usize), // set deafault style by index
     // notes collection load result shared for Load and Import
     LoadNotesCompleted(NotesCollection),
@@ -179,6 +181,14 @@ impl cosmic::Application for AppModel {
     /// Elements to pack at the start of the header bar.
     fn header_start(&self) -> Vec<Element<'_, Self::Message>> {
         let import_available = !self.config.import_file.is_empty();
+        let hide_avail = self
+            .notes
+            .get_all_notes()
+            .any(|(_, note)| note.is_visible());
+        let show_avail = self
+            .notes
+            .get_all_notes()
+            .any(|(_, note)| !note.is_visible());
         let menu_bar = menu::bar(vec![menu::Tree::with_children(
             menu::root(fl!("data")).apply(Element::from),
             menu::items(
@@ -196,6 +206,17 @@ impl cosmic::Application for AppModel {
                         menu::Item::Button(fl!("export"), None, MenuAction::Export)
                     } else {
                         menu::Item::ButtonDisabled(fl!("export"), None, MenuAction::Export)
+                    },
+                    menu::Item::Divider,
+                    if hide_avail {
+                        menu::Item::Button(fl!("hide-all"), None, MenuAction::HideAll)
+                    } else {
+                        menu::Item::ButtonDisabled(fl!("hide-all"), None, MenuAction::HideAll)
+                    },
+                    if show_avail {
+                        menu::Item::Button(fl!("show-all"), None, MenuAction::ShowAll)
+                    } else {
+                        menu::Item::ButtonDisabled(fl!("show-all"), None, MenuAction::ShowAll)
                     },
                 ],
             ),
@@ -335,6 +356,10 @@ impl cosmic::Application for AppModel {
                 let export_file = self.config.import_file.clone();
                 let notes = self.notes.clone();
                 return cosmic::task::future(Self::export_notes(export_file, notes));
+            }
+
+            Message::SetAllVisible(on) => {
+                return self.on_set_visibility(on);
             }
 
             Message::SetDefaultStyle(style_index) => {
@@ -586,6 +611,15 @@ impl AppModel {
         }
     }
 
+    fn on_set_visibility(&mut self, on: bool) -> Task<cosmic::Action<Message>> {
+        self.notes.for_each_note_mut(|note| note.set_visibility(on));
+        if on {
+            cosmic::task::batch(self.spawn_sticky_windows())
+        } else {
+            cosmic::task::batch(self.close_sticky_windows())
+        }
+    }
+
     fn on_start_edit(&mut self, window_id: Id, note_id: Uuid) {
         if let Some(note) = self.notes.try_get_note(&note_id) {
             self.editing = Some(EditContext {
@@ -715,6 +749,14 @@ impl AppModel {
             id,
             spawn_window.map(move |id| cosmic::Action::App(Message::NewWindow(id, note_id))),
         )
+    }
+
+    fn close_sticky_windows(&mut self) -> Vec<Task<cosmic::Action<Message>>> {
+        let existing_windows = std::mem::take(&mut self.windows);
+        existing_windows
+            .into_keys()
+            .map(window::close)
+            .collect::<Vec<Task<cosmic::Action<Message>>>>()
     }
 
     fn build_main_view(&self) -> Element<'static, Message> {
@@ -869,6 +911,8 @@ pub enum MenuAction {
     Save,
     Import,
     Export,
+    HideAll,
+    ShowAll,
 }
 
 impl menu::action::MenuAction for MenuAction {
@@ -880,6 +924,8 @@ impl menu::action::MenuAction for MenuAction {
             MenuAction::Save => Message::SaveNotes,
             MenuAction::Import => Message::ImportNotes,
             MenuAction::Export => Message::ExportNotes,
+            MenuAction::ShowAll => Message::SetAllVisible(true),
+            MenuAction::HideAll => Message::SetAllVisible(false),
         }
     }
 }

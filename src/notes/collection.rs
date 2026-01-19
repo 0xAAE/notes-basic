@@ -177,6 +177,13 @@ impl NotesCollection {
         self.notes.get_mut(id)
     }
 
+    pub fn for_each_note_mut<F>(&mut self, f: F)
+    where
+        F: Fn(&mut NoteData),
+    {
+        self.notes.iter_mut().for_each(|(_, note)| f(note));
+    }
+
     pub fn is_empty(&self) -> bool {
         self.notes.is_empty()
     }
@@ -299,7 +306,7 @@ impl NotesCollection {
 
     // test if collection looks like instantiated by default()
     pub fn is_default_collection(&self) -> bool {
-        self.notes.is_empty() && self.styles.len() < 2
+        self.notes.len()  <= 1 && self.styles.len() <= 1
     }
 
     fn ensure_default_style(&mut self) {
@@ -418,4 +425,35 @@ fn create_read_update_delete_restore_operations() {
     collection.commit_changes();
     // collection is not changed
     assert!(!collection.is_changed());
+}
+
+#[test]
+fn for_each_note_mut() {
+    const NOTES_COUNT: usize = 10;
+
+    let mut collection = NotesCollection::default();
+    assert_eq!(collection.len(), 1); // assume auto created new note with default syle
+
+    // fill up collection with new NOTES_COUNT notes
+    for _ in 0..NOTES_COUNT {
+        collection.new_note();
+    }
+    assert_eq!(collection.len(), NOTES_COUNT + 1);
+
+    // test all of notes are visible
+    assert!(
+        collection
+            .get_all_notes()
+            .all(|(_, note)| note.is_visible())
+    );
+
+    // using for_eahc_not_mut() to hgide all notes
+    collection.for_each_note_mut(|note: &mut NoteData| note.set_visibility(false));
+
+    // test all of notes are hidden
+    assert!(
+        !collection
+            .get_all_notes()
+            .any(|(_, note)| note.is_visible())
+    );
 }
