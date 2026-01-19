@@ -10,6 +10,7 @@ view = Вид
 about = Информация
 hide-all = Скрыть все
 show-all = Показать все
+lock-all = Заблокировать все
 select-default-style = Стиль для новой заметки:
 repository = Репозиторий
 git-description = Git commit {$hash} от {$date}

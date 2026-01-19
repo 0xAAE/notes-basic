@@ -10,6 +10,7 @@ view = View
 about = About
 hide-all = Hide all
 show-all = Show all
+lock-all = Lock all
 select-default-style = New sticky window style:
 repository = Repository
 git-description = Git commit {$hash} on {$date}

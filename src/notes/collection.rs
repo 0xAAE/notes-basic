@@ -306,7 +306,7 @@ impl NotesCollection {
 
     // test if collection looks like instantiated by default()
     pub fn is_default_collection(&self) -> bool {
-        self.notes.len()  <= 1 && self.styles.len() <= 1
+        self.notes.len() <= 1 && self.styles.len() <= 1
     }
 
     fn ensure_default_style(&mut self) {

@@ -84,6 +84,7 @@ pub enum Message {
     ImportNotes,
     ExportNotes,
     SetAllVisible(bool), // on / off
+    LockAll,
     // settings actions
     SetDefaultStyle(usize), // set deafault style by index
     // notes collection load result shared for Load and Import
@@ -189,6 +190,10 @@ impl cosmic::Application for AppModel {
             .notes
             .get_all_notes()
             .any(|(_, note)| !note.is_visible());
+        let lock_avail = self
+            .notes
+            .get_all_notes()
+            .any(|(_, note)| !note.is_locked());
         let menu_bar = menu::bar(vec![menu::Tree::with_children(
             menu::root(fl!("data")).apply(Element::from),
             menu::items(
@@ -217,6 +222,11 @@ impl cosmic::Application for AppModel {
                         menu::Item::Button(fl!("show-all"), None, MenuAction::ShowAll)
                     } else {
                         menu::Item::ButtonDisabled(fl!("show-all"), None, MenuAction::ShowAll)
+                    },
+                    if lock_avail {
+                        menu::Item::Button(fl!("lock-all"), None, MenuAction::LockAll)
+                    } else {
+                        menu::Item::ButtonDisabled(fl!("lock-all"), None, MenuAction::LockAll)
                     },
                 ],
             ),
@@ -360,6 +370,10 @@ impl cosmic::Application for AppModel {
 
             Message::SetAllVisible(on) => {
                 return self.on_set_visibility(on);
+            }
+
+            Message::LockAll => {
+                self.notes.for_each_note_mut(|note| note.set_locking(true));
             }
 
             Message::SetDefaultStyle(style_index) => {
@@ -913,6 +927,7 @@ pub enum MenuAction {
     Export,
     HideAll,
     ShowAll,
+    LockAll,
 }
 
 impl menu::action::MenuAction for MenuAction {
@@ -926,6 +941,7 @@ impl menu::action::MenuAction for MenuAction {
             MenuAction::Export => Message::ExportNotes,
             MenuAction::ShowAll => Message::SetAllVisible(true),
             MenuAction::HideAll => Message::SetAllVisible(false),
+            MenuAction::LockAll => Message::LockAll,
         }
     }
 }
