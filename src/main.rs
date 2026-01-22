@@ -6,6 +6,7 @@ mod i18n;
 mod icons;
 #[allow(dead_code)]
 mod notes;
+mod utils;
 
 fn main() -> cosmic::iced::Result {
     // Get the system's preferred languages.

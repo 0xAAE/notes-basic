@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MPL-2.0
 
 use std::collections::HashMap;
-use std::ops::Not;
 
 use crate::{
     config::Config,
     fl, icons,
     notes::{INVISIBLE_TEXT, NoteData, NotesCollection},
+    utils::{to_f32, to_usize},
 };
 use cosmic::prelude::*;
 use cosmic::{
@@ -22,22 +22,6 @@ use cosmic::{
     widget::{self, menu},
 };
 use uuid::Uuid;
-
-// const APP_ICON: &[u8] = include_bytes!("../resources/icons/hicolor/scalable/apps/icon.svg");
-const DEF_DATA_FILE: &str = ".config/indicator-stickynotes";
-const ICON_SIZE: u16 = 16;
-
-#[inline]
-#[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-const fn to_usize(v: f32) -> usize {
-    v as usize
-}
-
-#[inline]
-#[allow(clippy::cast_precision_loss)]
-const fn to_f32(v: usize) -> f32 {
-    v as f32
-}
 
 /// The application model stores app-specific state used to describe its interface and
 /// drive its logic.
@@ -56,6 +40,7 @@ pub struct AppModel {
     /// windows by ID
     windows: HashMap<Id, WindowContext>,
     cursor_window: Option<Id>,
+    restore_window: Option<Id>,
     #[cfg(not(feature = "xdg_icons"))]
     icons: icons::IconSet,
     #[cfg(feature = "xdg_icons")]
@@ -79,6 +64,7 @@ pub enum Message {
     UpdateConfig(Config),
     // Windows
     NewWindow(Id, Uuid), // (window_id, note_id)
+    NewWindowRestore(Id),
     // After menu actions
     LoadNotes,
     SaveNotes,
@@ -86,6 +72,7 @@ pub enum Message {
     ExportNotes,
     SetAllVisible(bool), // on / off
     LockAll,
+    RestoreNotes,
     // settings actions
     SetDefaultStyle(usize), // set deafault style by index
     // notes collection load result shared for Load and Import
@@ -165,6 +152,7 @@ impl cosmic::Application for AppModel {
             editing: None,
             windows: HashMap::new(),
             cursor_window: None,
+            restore_window: None,
             icons: icons::IconSet::new(),
         };
 
@@ -174,8 +162,9 @@ impl cosmic::Application for AppModel {
         // and if indicator-stickynotes is set try import from it
         if app.notes.is_default_collection() {
             // try read import_file name from config or construct default path to indicator-stickynotes data file
-            let import_file = app.config.import_file.clone();
-            startup_tasks.push(cosmic::task::future(Self::import_notes(import_file)));
+            startup_tasks.push(cosmic::task::future(Self::import_notes(
+                app.config.import_file.clone(),
+            )));
         }
 
         (app, cosmic::task::batch(startup_tasks))
@@ -196,6 +185,7 @@ impl cosmic::Application for AppModel {
             .notes
             .get_all_notes()
             .any(|(_, note)| !note.is_locked());
+        let restore_avail = self.notes.get_all_deleted_notes().next().is_some();
         let menu_bar = menu::bar(vec![menu::Tree::with_children(
             menu::root(fl!("data")).apply(Element::from),
             menu::items(
@@ -230,6 +220,15 @@ impl cosmic::Application for AppModel {
                     } else {
                         menu::Item::ButtonDisabled(fl!("lock-all"), None, MenuAction::LockAll)
                     },
+                    if restore_avail {
+                        menu::Item::Button(fl!("restore-notes"), None, MenuAction::RestoreNotes)
+                    } else {
+                        menu::Item::ButtonDisabled(
+                            fl!("restore-notes"),
+                            None,
+                            MenuAction::RestoreNotes,
+                        )
+                    },
                 ],
             ),
         )]);
@@ -251,11 +250,17 @@ impl cosmic::Application for AppModel {
             let note_bg = self
                 .notes
                 .try_get_note_style(window_context.note_id)
-                .map(|style| style.bgcolor);
-            let window_interior = self.build_sticky_window_interior(id, window_context);
-            let window_content =
-                Self::with_background(window_interior, note_bg.unwrap_or(Color::WHITE));
-            iced::widget::column![window_content].into()
+                .map_or(Color::WHITE, |style| style.bgcolor);
+            let window_content = self.build_sticky_window_view(id, window_context);
+            let window_view = Self::with_background(window_content, note_bg);
+            iced::widget::column![window_view].into()
+        } else if let Some(restore_id) = self.restore_window
+            && restore_id == id
+        {
+            widget::container(self.build_restore_view())
+                .class(cosmic::style::Container::Background)
+                .padding(cosmic::theme::spacing().space_s)
+                .into()
         } else {
             self.build_main_view()
         }
@@ -356,6 +361,10 @@ impl cosmic::Application for AppModel {
                 self.notes.for_each_note_mut(|note| note.set_locking(true));
             }
 
+            Message::RestoreNotes => {
+                return self.spawn_restore_notes_window();
+            }
+
             Message::SetDefaultStyle(style_index) => {
                 if !self.notes.try_set_default_style_by_index(style_index) {
                     eprintln!(
@@ -390,6 +399,11 @@ impl cosmic::Application for AppModel {
                         select_style: None,
                     },
                 );
+            }
+
+            Message::NewWindowRestore(id) => {
+                self.restore_window = Some(id);
+                return self.set_window_title(fl!("recently-deleted-title"), id);
             }
 
             // redirect edit actions to the edit context
@@ -485,7 +499,7 @@ impl AppModel {
             .and_then(|context| self.notes.try_get_note_mut(&context.note_id))
     }
 
-    fn get_edit_now(&self, window_id: Id) -> Option<&EditContext> {
+    fn try_get_edit_context(&self, window_id: Id) -> Option<&EditContext> {
         self.editing.as_ref().and_then(|context| {
             if context.window_id == window_id {
                 Some(context)
@@ -522,64 +536,49 @@ impl AppModel {
         Ok(())
     }
 
-    fn try_get_import_file(configured_import_file: String) -> Option<String> {
-        configured_import_file
-            .is_empty()
-            .not()
-            .then_some(configured_import_file)
-            .or_else(|| {
-                dirs_next::home_dir().map(|mut home| {
-                    home.push(DEF_DATA_FILE);
-                    home.display().to_string()
-                })
-            })
-    }
-
     async fn import_notes(configured_import_file: String) -> Message {
-        match Self::try_get_import_file(configured_import_file) {
-            Some(import_file) => {
-                let import_file_owned = import_file.clone();
-                match tokio::task::spawn_blocking(move || {
-                    NotesCollection::try_import(import_file_owned)
-                })
-                .await
-                {
-                    Ok(task) => match task.await {
-                        Ok(v) => Message::LoadNotesCompleted(v),
-                        Err(e) => {
-                            let msg =
-                                format!("failed reading notes from {}: {e}", import_file.as_str());
-                            Message::LoadNotesFailed(msg)
-                        }
-                    },
-                    Err(e) => Message::LoadNotesFailed(format!("{e}")),
-                }
+        if configured_import_file.is_empty() {
+            Message::LoadNotesFailed("No import file is set".to_string())
+        } else {
+            let import_file_owned = configured_import_file.clone();
+            match tokio::task::spawn_blocking(move || {
+                NotesCollection::try_import(import_file_owned)
+            })
+            .await
+            {
+                Ok(task) => match task.await {
+                    Ok(v) => Message::LoadNotesCompleted(v),
+                    Err(e) => {
+                        let msg =
+                            format!("failed reading notes from {configured_import_file}: {e}");
+                        Message::LoadNotesFailed(msg)
+                    }
+                },
+                Err(e) => Message::LoadNotesFailed(format!("{e}")),
             }
-            None => Message::LoadNotesFailed("No import file is set".to_string()),
         }
     }
 
     async fn export_notes(configured_export_file: String, notes: NotesCollection) -> Message {
-        match Self::try_get_import_file(configured_export_file) {
-            Some(export_file) => {
-                let export_file_owned = export_file.clone();
-                match tokio::task::spawn_blocking(move || {
-                    NotesCollection::try_export(export_file_owned, notes)
-                })
-                .await
-                {
-                    Ok(task) => match task.await {
-                        Ok(()) => Message::ExportNotesCompleted,
-                        Err(e) => {
-                            let msg =
-                                format!("failed reading notes from {}: {e}", export_file.as_str());
-                            Message::ExportNotesFailed(msg)
-                        }
-                    },
-                    Err(e) => Message::ExportNotesFailed(format!("{e}")),
-                }
+        if configured_export_file.is_empty() {
+            Message::ExportNotesFailed("No export file is set".to_string())
+        } else {
+            let export_file_owned = configured_export_file.clone();
+            match tokio::task::spawn_blocking(move || {
+                NotesCollection::try_export(export_file_owned, notes)
+            })
+            .await
+            {
+                Ok(task) => match task.await {
+                    Ok(()) => Message::ExportNotesCompleted,
+                    Err(e) => {
+                        let msg =
+                            format!("failed reading notes from {configured_export_file}: {e}");
+                        Message::ExportNotesFailed(msg)
+                    }
+                },
+                Err(e) => Message::ExportNotesFailed(format!("{e}")),
             }
-            None => Message::ExportNotesFailed("No export file is set".to_string()),
         }
     }
 
@@ -608,11 +607,7 @@ impl AppModel {
 
     fn on_change_note_locking(&mut self, window_id: Id, is_on: bool) {
         if let Some(note) = self.try_get_note_mut(window_id) {
-            if is_on {
-                note.set_locking(true);
-            } else {
-                note.set_locking(false);
-            }
+            note.set_locking(is_on);
         } else {
             println!("{window_id}: note is not found to change locking");
         }
@@ -726,6 +721,11 @@ impl AppModel {
                     note.set_position(to_usize(point.x), to_usize(point.y));
                 }
             }
+            WindowEvent::Closed => {
+                if let Some(restore_id) = self.restore_window && restore_id ==id {
+                    self.restore_window = None;
+                }
+            }
             _ => {}
         }
         Task::none()
@@ -755,6 +755,14 @@ impl AppModel {
         )
     }
 
+    fn spawn_restore_notes_window(&self) -> Task<cosmic::Action<Message>> {
+        let (_id, spawn_window) = window::open(window::Settings {
+            size: self.config.restore_notes_size(),
+            ..Default::default()
+        });
+        spawn_window.map(|id| cosmic::Action::App(Message::NewWindowRestore(id)))
+    }
+
     fn close_sticky_windows(&mut self) -> Vec<Task<cosmic::Action<Message>>> {
         let existing_windows = std::mem::take(&mut self.windows);
         existing_windows
@@ -774,7 +782,8 @@ impl AppModel {
                 .into();
         }
         let default_style_index = self.notes.default_style_index();
-        widget::column::with_capacity(4)
+        widget::column::with_capacity(2)
+            .spacing(cosmic::theme::spacing().space_s)
             .push(widget::divider::horizontal::light())
             .push(
                 widget::row::with_capacity(2)
@@ -788,7 +797,15 @@ impl AppModel {
                         .placeholder("Choose a style..."),
                     ),
             )
-            .push(widget::text(fl!("recently-deleted")))
+            .width(Length::Fill)
+            .height(Length::Fill)
+            .into()
+    }
+
+    fn build_restore_view(&self) -> Element<'_, Message> {
+        widget::column::with_capacity(2)
+            .spacing(cosmic::theme::spacing().space_m)
+            .push(widget::text(fl!("recently-deleted-description")))
             .push(
                 widget::scrollable(keyed_column(
                     //(0..=100).map(|i| (i, text!("Item {i}").into())),
@@ -805,17 +822,17 @@ impl AppModel {
     }
 
     #[allow(clippy::too_many_lines)]
-    fn build_sticky_window_interior<'a>(
+    fn build_sticky_window_view<'a>(
         &'a self,
         id: Id,
         window_context: &'a WindowContext,
     ) -> Element<'a, Message> {
-        if let Some(edit_context) = self.get_edit_now(id) {
+        if let Some(edit_context) = self.try_get_edit_context(id) {
             let note_toolbar = widget::row::with_capacity(1).push(
                 self.icons
                     .edit()
                     .apply(widget::button::icon)
-                    .icon_size(ICON_SIZE)
+                    .icon_size(self.config.toolbar_icon_size)
                     .on_press(Message::NoteEdit(id, false))
                     .width(Length::Shrink),
             );
@@ -847,7 +864,7 @@ impl AppModel {
                         self.icons.lock()
                     }
                     .apply(widget::button::icon)
-                    .icon_size(ICON_SIZE)
+                    .icon_size(self.config.toolbar_icon_size)
                     .on_press(Message::NoteLock(id, !is_locked))
                     .width(Length::Shrink),
                 );
@@ -856,7 +873,7 @@ impl AppModel {
                     self.icons
                         .edit()
                         .apply(widget::button::icon)
-                        .icon_size(ICON_SIZE)
+                        .icon_size(self.config.toolbar_icon_size)
                         .on_press(Message::NoteEdit(id, true))
                         .width(Length::Shrink),
                 );
@@ -876,7 +893,7 @@ impl AppModel {
                         self.icons
                             .down()
                             .apply(widget::button::icon)
-                            .icon_size(ICON_SIZE)
+                            .icon_size(self.config.toolbar_icon_size)
                             .on_press(Message::NoteStyle(id))
                             .width(Length::Shrink),
                     );
@@ -885,7 +902,7 @@ impl AppModel {
                     self.icons
                         .delete()
                         .apply(widget::button::icon)
-                        .icon_size(ICON_SIZE)
+                        .icon_size(self.config.toolbar_icon_size)
                         .on_press(Message::NoteDelete(id))
                         .width(Length::Shrink),
                 );
@@ -896,7 +913,7 @@ impl AppModel {
                     self.icons
                         .create()
                         .apply(widget::button::icon)
-                        .icon_size(ICON_SIZE)
+                        .icon_size(self.config.toolbar_icon_size)
                         .on_press(Message::NoteNew)
                         .width(Length::Shrink),
                 );
@@ -928,7 +945,7 @@ impl AppModel {
                 self.icons
                     .undo()
                     .apply(widget::button::icon)
-                    .icon_size(ICON_SIZE)
+                    .icon_size(self.config.toolbar_icon_size)
                     .on_press(Message::NoteRestore(note_id))
                     .width(Length::Shrink),
             )
@@ -959,8 +976,6 @@ impl AppModel {
                     shadow: iced::Shadow::default(),
                 }
             }))
-            // .center_x(Length::Fill)
-            // .center_y(Length::Fill)
             .padding(cosmic::theme::spacing().space_xs)
             .into()
     }
@@ -975,6 +990,7 @@ pub enum MenuAction {
     HideAll,
     ShowAll,
     LockAll,
+    RestoreNotes,
 }
 
 impl menu::action::MenuAction for MenuAction {
@@ -989,6 +1005,7 @@ impl menu::action::MenuAction for MenuAction {
             MenuAction::ShowAll => Message::SetAllVisible(true),
             MenuAction::HideAll => Message::SetAllVisible(false),
             MenuAction::LockAll => Message::LockAll,
+            MenuAction::RestoreNotes => Message::RestoreNotes,
         }
     }
 }
