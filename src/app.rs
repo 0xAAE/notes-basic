@@ -286,22 +286,29 @@ impl cosmic::Application for AppModel {
                     Message::UpdateConfig(update.config)
                 }),
             // subscribe to some interested events from mouse and window:
-            iced::event::listen_with(|evt, status, id| {
-                if status == EventStatus::Ignored {
-                    match evt {
-                        Event::Mouse(MouseEvent::CursorMoved { .. })
-                        | Event::Window(WindowEvent::RedrawRequested(_)) => None,
-                        Event::Mouse(mouse_event) => {
-                            Some(Message::AppMouseEvent((id, mouse_event)))
-                        }
-                        Event::Window(window_event) => {
-                            Some(Message::AppWindowEvent((id, window_event)))
-                        }
-                        _ => None,
+            iced::event::listen_with(|evt, status, id| match evt {
+                Event::Mouse(MouseEvent::CursorMoved { .. })
+                | Event::Window(WindowEvent::RedrawRequested(_)) => None,
+                Event::Mouse(mouse_event) => {
+                    // get Mouse events onpy if unhandled
+                    if status == EventStatus::Ignored {
+                        Some(Message::AppMouseEvent((id, mouse_event)))
+                    } else {
+                        None
                     }
-                } else {
-                    None
                 }
+                Event::Window(window_event) => {
+                    // get Closed & CloseRequested always, others only if unhandled
+                    if window_event == WindowEvent::CloseRequested
+                        || window_event == WindowEvent::Closed
+                        || status == EventStatus::Ignored
+                    {
+                        Some(Message::AppWindowEvent((id, window_event)))
+                    } else {
+                        None
+                    }
+                }
+                _ => None,
             }),
         ];
         Subscription::batch(subscriptions)
@@ -721,9 +728,18 @@ impl AppModel {
                     note.set_position(to_usize(point.x), to_usize(point.y));
                 }
             }
+            // do nothing with CloseRequested at the moment:
+            // WindowEvent::CloseRequested => {}
             WindowEvent::Closed => {
-                if let Some(restore_id) = self.restore_window && restore_id ==id {
+                if let Some(restore_id) = self.restore_window
+                    && restore_id == id
+                {
+                    // restore window has closed, forget its id
                     self.restore_window = None;
+                } else if let Some(main_id) = self.core.main_window_id()
+                    && main_id == id
+                {
+                    return self.close_all_windows();
                 }
             }
             _ => {}
@@ -769,6 +785,14 @@ impl AppModel {
             .into_keys()
             .map(window::close)
             .collect::<Vec<Task<cosmic::Action<Message>>>>()
+    }
+
+    fn close_all_windows(&mut self) -> Task<cosmic::Action<Message>> {
+        let mut commands = self.close_sticky_windows();
+        if let Some(restore_id) = self.restore_window {
+            commands.push(window::close(restore_id));
+        }
+        cosmic::task::batch(commands)
     }
 
     fn build_main_view(&self) -> Element<'_, Message> {
