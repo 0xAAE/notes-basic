@@ -3,6 +3,7 @@
 use std::collections::HashMap;
 
 use crate::{
+    app::styles_view::build_styles_list_view,
     config::Config,
     fl, icons,
     notes::{NoteData, NotesCollection},
@@ -19,12 +20,14 @@ use cosmic::{
     },
     widget::{self, menu},
 };
+use edit_style::edit_style_dialog;
 use restore_view::build_restore_view;
 use sticky_window::StickyWindow;
 use utils::with_background;
 pub use utils::{to_f32, to_usize};
 use uuid::Uuid;
 
+mod edit_style;
 mod restore_view;
 mod sticky_window;
 mod styles_view;
@@ -46,6 +49,8 @@ pub struct AppModel {
     windows: HashMap<Id, StickyWindow>,
     cursor_window: Option<Id>,
     restore_window: Option<Id>,
+    // optional currently edit style defined by its id:
+    edit_style_active: Option<Uuid>,
     #[cfg(not(feature = "xdg_icons"))]
     icons: icons::IconSet,
     #[cfg(feature = "xdg_icons")]
@@ -90,6 +95,11 @@ pub enum Message {
     NoteNew,                     // create new note with default syle and begin edit
     NoteDelete(Id),              // delete note
     NoteRestore(Uuid),           // restore note
+    // styles view button actions
+    StyleEdit(Uuid),   // edit style by style_id
+    StyleDelete(Uuid), // delete style by style_id
+    EditStyleUpdate,   // Ok was pressed in edit style dialog
+    EditStyleCancel,   // Cancel was pressed in edit style dialog
 }
 
 /// Create a COSMIC application from the app model
@@ -146,6 +156,7 @@ impl cosmic::Application for AppModel {
             windows: HashMap::new(),
             cursor_window: None,
             restore_window: None,
+            edit_style_active: None,
             icons: icons::IconSet::new(),
         };
 
@@ -456,8 +467,33 @@ impl cosmic::Application for AppModel {
             Message::NoteRestore(note_id) => {
                 return self.on_restore_note(note_id);
             }
+
+            Message::StyleEdit(style_id) => {
+                println!("edit style {style_id}");
+                self.edit_style_active = Some(style_id);
+            }
+
+            Message::StyleDelete(style_id) => {
+                println!("delete style {style_id}");
+            }
+
+            Message::EditStyleUpdate => {
+                println!("edit style update");
+                self.edit_style_active = None;
+            }
+
+            Message::EditStyleCancel => {
+                println!("edit style cancel");
+                self.edit_style_active = None;
+            }
         }
         Task::none()
+    }
+
+    fn dialog(&self) -> Option<Element<'_, Self::Message>> {
+        self.edit_style_active
+            .and_then(|style_id| self.notes.try_get_style(&style_id))
+            .map(|style| edit_style_dialog(style))
     }
 
     fn on_app_exit(&mut self) -> Option<Self::Message> {
@@ -768,8 +804,10 @@ impl AppModel {
                 .into();
         }
         let default_style_index = self.notes.try_get_default_style_index();
-        widget::column::with_capacity(2)
+        widget::column::with_capacity(3)
             .spacing(cosmic::theme::spacing().space_s)
+            .width(Length::Fill)
+            .height(Length::Fill)
             .push(widget::divider::horizontal::light())
             .push(
                 widget::row::with_capacity(2)
@@ -783,8 +821,11 @@ impl AppModel {
                         .placeholder("Choose a style..."),
                     ),
             )
-            .width(Length::Fill)
-            .height(Length::Fill)
+            .push(build_styles_list_view(
+                &self.notes,
+                &self.icons,
+                self.config.toolbar_icon_size,
+            ))
             .into()
     }
 }

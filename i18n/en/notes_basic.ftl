@@ -14,6 +14,7 @@ lock-all = Lock all
 restore-notes = Restore note...
 recently-deleted-title = Recently deleted notes
 recently-deleted-description = To restore any note press button on the right
+styles-list-description = Currently available note styles
 select-default-style = New sticky window style:
 repository = Repository
 git-description = Git commit {$hash} on {$date}

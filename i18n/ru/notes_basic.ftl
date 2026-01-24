@@ -14,6 +14,7 @@ lock-all = Заблокировать все
 restore-notes = Восстановить заметку...
 recently-deleted-title = Недавно удаленные заметки
 recently-deleted-description = Чтобы восстановить ранее удаленную заметку, найдите ее и нажмите кнопку справа
+styles-list-description = Стили отрисовки заметок
 select-default-style = Стиль для новой заметки:
 repository = Репозиторий
 git-description = Git commit {$hash} от {$date}
