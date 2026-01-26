@@ -244,6 +244,10 @@ impl NotesCollection {
 
     // operations with styles
 
+    pub fn get_styles_count(&self) -> usize {
+        self.styles.len()
+    }
+
     pub fn iter_styles(&self) -> Iter<'_, Uuid, NoteStyle> {
         self.styles.iter()
     }
@@ -292,6 +296,21 @@ impl NotesCollection {
         F: Fn(&mut NoteStyle),
     {
         self.styles.values_mut().for_each(f);
+    }
+
+    pub fn new_style(&mut self, name: String) -> Uuid {
+        let id = Uuid::new_v4();
+        let new_style = if let Some(source) = self.try_get_default_style() {
+            NoteStyle::new(
+                name,
+                source.get_font_name().to_string(),
+                source.get_background_color(),
+            )
+        } else {
+            NoteStyle::new(name, "?".to_string(), Color::WHITE)
+        };
+        self.styles.insert(id, new_style);
+        id
     }
 
     // operations with particular note style

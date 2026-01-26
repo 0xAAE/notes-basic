@@ -96,6 +96,7 @@ pub enum Message {
     NoteDelete(Id),              // delete note
     NoteRestore(Uuid),           // restore note
     // styles view button actions
+    StyleNew,               // add new style
     StyleEdit(Uuid),        // edit style by style_id
     StyleDelete(Uuid),      // delete style by style_id
     EditStyleUpdate,        // Ok was pressed in edit style dialog
@@ -470,6 +471,10 @@ impl cosmic::Application for AppModel {
                 return self.on_restore_note(note_id);
             }
 
+            Message::StyleNew => {
+                self.on_new_style();
+            }
+
             Message::StyleEdit(style_id) => {
                 if let Some(style) = self.notes.try_get_style(&style_id) {
                     self.edit_style_dialog = Some(EditStyleDialog::new(style_id, style));
@@ -699,6 +704,18 @@ impl AppModel {
         }
     }
 
+    fn on_new_style(&mut self) {
+        let name = format!(
+            "{}-{}",
+            fl!("new-style-name"),
+            self.notes.get_styles_count()
+        );
+        let style_id = self.notes.new_style(name);
+        if let Some(style) = self.notes.try_get_style_mut(&style_id) {
+            self.edit_style_dialog = Some(EditStyleDialog::new(style_id, style));
+        }
+    }
+
     fn on_style_updated(&mut self, style_id: Uuid, name: &str, font_name: &str, bgcolor: Color) {
         if let Some(style) = self.notes.try_get_style_mut(&style_id) {
             style.set_name(name);
@@ -836,7 +853,7 @@ impl AppModel {
                 .into();
         }
         let default_style_index = self.notes.try_get_default_style_index();
-        widget::column::with_capacity(3)
+        widget::column::with_capacity(4)
             .spacing(cosmic::theme::spacing().space_s)
             .width(Length::Fill)
             .height(Length::Fill)
@@ -853,6 +870,7 @@ impl AppModel {
                         .placeholder("Choose a style..."),
                     ),
             )
+            .push(widget::button::text(fl!("create-new-style")).on_press(Message::StyleNew))
             .push(build_styles_list_view(
                 &self.notes,
                 &self.icons,
