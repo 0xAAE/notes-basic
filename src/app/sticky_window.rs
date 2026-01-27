@@ -103,7 +103,7 @@ impl StickyWindow {
                 .push(note_toolbar)
                 .push(note_content)
                 .into()
-        } else if let Some(note) = notes.try_get_note(&self.note_id) {
+        } else if let Ok(note) = notes.try_get_note(&self.note_id) {
             let is_locked = note.is_locked();
 
             let mut note_toolbar = widget::row::with_capacity(7)
@@ -133,7 +133,10 @@ impl StickyWindow {
                     note_toolbar = note_toolbar.push(
                         widget::dropdown(
                             styles,
-                            notes.try_get_note_style_index(self.note_id),
+                            notes
+                                .try_get_note_style_index(self.note_id)
+                                .map_err(|e| eprintln!("Failed to get style index: {e}"))
+                                .ok(),
                             move |index| Message::NoteSyleSelected(window_id, index),
                         )
                         .placeholder(fl!("select-default-style")),

@@ -373,10 +373,8 @@ impl cosmic::Application for AppModel {
             }
 
             Message::SetDefaultStyle(style_index) => {
-                if !self.notes.try_set_default_style_by_index(style_index) {
-                    eprintln!(
-                        "failed cghanging default sticly window style to {style_index}: no such style"
-                    );
+                if let Err(e) = self.notes.try_set_default_style_by_index(style_index) {
+                    eprintln!("failed changing default style: {e}");
                 }
             }
 
@@ -428,10 +426,11 @@ impl cosmic::Application for AppModel {
             }
 
             Message::WindowPositionResponse((id, location)) => {
-                if let Some(point) = location
-                    && let Some(note) = self.try_get_note_mut(id)
-                {
-                    note.set_position(to_usize(point.x), to_usize(point.y));
+                if let Some(point) = location {
+                    match self.try_get_note_mut(id) {
+                        Ok(note) => note.set_position(to_usize(point.x), to_usize(point.y)),
+                        Err(e) => eprintln!("Failed to update position: {e}"),
+                    }
                 }
             }
 
@@ -451,7 +450,7 @@ impl cosmic::Application for AppModel {
                 if let Some(sticky_window) = self.windows.get_mut(&id) {
                     sticky_window.allow_select_style(self.notes.get_style_names());
                 } else {
-                    eprintln!("{id}: note is not found to change style");
+                    eprintln!("{id}: sticky window is not found to change style");
                 }
             }
 
@@ -475,15 +474,13 @@ impl cosmic::Application for AppModel {
                 self.on_new_style();
             }
 
-            Message::StyleEdit(style_id) => {
-                if let Some(style) = self.notes.try_get_style(&style_id) {
-                    self.edit_style_dialog = Some(EditStyleDialog::new(style_id, style));
-                }
-            }
+            Message::StyleEdit(style_id) => match self.notes.try_get_style(&style_id) {
+                Ok(style) => self.edit_style_dialog = Some(EditStyleDialog::new(style_id, style)),
+                Err(e) => eprintln!("{e}"),
+            },
 
             Message::StyleDelete(style_id) => {
-                //TODO: implement style deleting
-                println!("delete style {style_id}");
+                self.on_delete_style(style_id);
             }
 
             Message::EditStyleUpdate => {
@@ -540,10 +537,15 @@ impl cosmic::Application for AppModel {
 }
 
 impl AppModel {
-    fn try_get_note_mut(&mut self, window_id: Id) -> Option<&mut NoteData> {
+    fn try_get_note_mut(&mut self, window_id: Id) -> Result<&mut NoteData, String> {
         self.windows
             .get(&window_id)
-            .and_then(|sticky_window| self.notes.try_get_note_mut(&sticky_window.get_note_id()))
+            .ok_or_else(|| format!("Sticky window {window_id} is not found"))
+            .and_then(|sticky_window| {
+                self.notes
+                    .try_get_note_mut(&sticky_window.get_note_id())
+                    .map_err(|e| e.to_string())
+            })
     }
 
     fn load_notes_or_default(config: &Config) -> NotesCollection {
@@ -621,30 +623,40 @@ impl AppModel {
 
     fn on_new_note_window(&mut self) -> Task<cosmic::Action<Message>> {
         let note_id = self.notes.new_note();
-        if let Some(note) = self.notes.try_get_note_mut(&note_id) {
-            let (window_id, task) = Self::spawn_sticky_window(&note_id, note);
-            task.chain(
-                cosmic::Task::done(Message::NoteEdit(window_id, true)).map(cosmic::Action::from),
-            )
-        } else {
-            Task::none()
+        match self.notes.try_get_note_mut(&note_id) {
+            Ok(note) => {
+                let (window_id, task) = Self::spawn_sticky_window(&note_id, note);
+                task.chain(
+                    cosmic::Task::done(Message::NoteEdit(window_id, true))
+                        .map(cosmic::Action::from),
+                )
+            }
+            Err(e) => {
+                eprintln!("Failed to create new note: {e}");
+                Task::none()
+            }
         }
     }
 
     fn on_restore_note(&mut self, note_id: Uuid) -> Task<cosmic::Action<Message>> {
-        if let Some(note) = self.notes.try_restore_deleted_note(note_id) {
-            let (_id, task) = Self::spawn_sticky_window(&note_id, note);
-            task
-        } else {
-            Task::none()
+        match self.notes.try_restore_deleted_note(note_id) {
+            Ok(note) => {
+                let (_id, task) = Self::spawn_sticky_window(&note_id, note);
+                task
+            }
+            Err(e) => {
+                eprintln!("Failed to restore note: {e}");
+                Task::none()
+            }
         }
     }
 
     fn on_change_note_locking(&mut self, window_id: Id, is_on: bool) {
-        if let Some(note) = self.try_get_note_mut(window_id) {
-            note.set_locking(is_on);
-        } else {
-            eprintln!("{window_id}: note is not found to change locking");
+        match self.try_get_note_mut(window_id) {
+            Ok(note) => {
+                note.set_locking(is_on);
+            }
+            Err(e) => eprintln!("Failed to change note locking: {e}"),
         }
     }
 
@@ -659,7 +671,7 @@ impl AppModel {
 
     fn on_start_edit(&mut self, window_id: Id) {
         if let Some(sticky_window) = self.windows.get_mut(&window_id) {
-            if let Some(note) = self.notes.try_get_note(&sticky_window.get_note_id())
+            if let Ok(note) = self.notes.try_get_note(&sticky_window.get_note_id())
                 && let Err(e) = sticky_window.start_edit(note.get_content())
             {
                 eprintln!("[{window_id}] failed to start edit: {e}");
@@ -671,7 +683,7 @@ impl AppModel {
 
     fn on_finish_edit(&mut self, window_id: Id) {
         if let Some(sticky_window) = self.windows.get_mut(&window_id) {
-            if let Some(note) = self.notes.try_get_note_mut(&sticky_window.get_note_id()) {
+            if let Ok(note) = self.notes.try_get_note_mut(&sticky_window.get_note_id()) {
                 match sticky_window.finish_edit() {
                     Ok(text) => note.set_content(text),
                     Err(e) => eprintln!("[{window_id}] failed to finish edit: {e}"),
@@ -682,17 +694,17 @@ impl AppModel {
         }
     }
 
-    fn on_style_selected(&mut self, id: Id, style_index: usize) {
-        if let Some(sticky_window) = self.windows.get_mut(&id) {
+    fn on_style_selected(&mut self, window_id: Id, style_index: usize) {
+        if let Some(sticky_window) = self.windows.get_mut(&window_id) {
             sticky_window.disable_select_style();
-            if !self
+            if let Err(e) = self
                 .notes
                 .try_set_note_style_by_index(sticky_window.get_note_id(), style_index)
             {
-                eprintln!("{id}: selectd style was not found to assign to sticky window");
+                eprintln!("[{window_id}] Failed select style: {e}");
             }
         } else {
-            eprintln!("{id}: sticky window is not found to change style");
+            eprintln!("[{window_id}] sticky window is not found to change style");
         }
     }
 
@@ -712,18 +724,40 @@ impl AppModel {
             self.notes.get_styles_count()
         );
         let style_id = self.notes.new_style(name);
-        if let Some(style) = self.notes.try_get_style_mut(&style_id) {
-            self.edit_style_dialog = Some(EditStyleDialog::new(style_id, style));
+        match self.notes.try_get_style_mut(&style_id) {
+            Ok(style) => {
+                self.edit_style_dialog = Some(EditStyleDialog::new(style_id, style));
+                // turn off style selectors in all of the sticky windows
+                self.windows
+                    .values_mut()
+                    .for_each(StickyWindow::disable_select_style);
+            }
+            Err(e) => eprintln!("Failed creating new style: {e}"),
+        }
+    }
+
+    fn on_delete_style(&mut self, style_id: Uuid) {
+        match self.notes.delete_style(style_id) {
+            Ok(()) => {
+                // as default style might be changed turn off style selectors in all of the sticky windows
+                self.windows
+                    .values_mut()
+                    .for_each(StickyWindow::disable_select_style);
+            }
+            Err(e) => {
+                eprintln!("Failed to delete style: {e}");
+            }
         }
     }
 
     fn on_style_updated(&mut self, style_id: Uuid, name: &str, font_name: &str, bgcolor: Color) {
-        if let Some(style) = self.notes.try_get_style_mut(&style_id) {
-            style.set_name(name);
-            style.set_font_name(font_name);
-            style.set_background_color(bgcolor);
-        } else {
-            eprintln!("failed to update style {style_id}: style not found");
+        match self.notes.try_get_style_mut(&style_id) {
+            Ok(style) => {
+                style.set_name(name);
+                style.set_font_name(font_name);
+                style.set_background_color(bgcolor);
+            }
+            Err(e) => eprintln!("Failed to update style: {e}"),
         }
     }
 
@@ -767,13 +801,23 @@ impl AppModel {
     ) -> Task<cosmic::Action<<AppModel as cosmic::Application>::Message>> {
         match event {
             WindowEvent::Resized(size) => {
-                if let Some(note) = self.try_get_note_mut(id) {
-                    note.set_size(to_usize(size.width), to_usize(size.height));
+                if self.windows.contains_key(&id) {
+                    match self.try_get_note_mut(id) {
+                        Ok(note) => {
+                            note.set_size(to_usize(size.width), to_usize(size.height));
+                        }
+                        Err(e) => eprintln!("Failed to update sticky window size: {e}"),
+                    }
                 }
             }
             WindowEvent::Moved(point) => {
-                if let Some(note) = self.try_get_note_mut(id) {
-                    note.set_position(to_usize(point.x), to_usize(point.y));
+                if self.windows.contains_key(&id) {
+                    match self.try_get_note_mut(id) {
+                        Ok(note) => {
+                            note.set_position(to_usize(point.x), to_usize(point.y));
+                        }
+                        Err(e) => eprintln!("Failed to update sticky window position: {e}"),
+                    }
                 }
             }
             // do nothing with CloseRequested at the moment:
@@ -853,7 +897,7 @@ impl AppModel {
                 .height(Length::Fill)
                 .into();
         }
-        let default_style_index = self.notes.try_get_default_style_index();
+        let default_style_index = self.notes.try_get_default_style_index().ok();
         widget::column::with_capacity(4)
             .spacing(cosmic::theme::spacing().space_s)
             .width(Length::Fill)

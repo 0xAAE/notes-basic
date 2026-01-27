@@ -34,6 +34,15 @@ pub enum NotesCollectionError {
     // Failed parsing input text
     #[error("Failed parsing notes: {0}")]
     Json(serde_json::Error),
+    // must not delete the last (and default) style
+    #[error("Cannot delete the last style")]
+    DeleteLastStyle,
+    #[error("Style {0} is not found")]
+    StyleNotFound(Uuid),
+    #[error("Style index {0} not found")]
+    StyleIndexNotFound(usize),
+    #[error("Note {0} is not found")]
+    NoteNotFound(Uuid),
 }
 
 #[derive(serde::Deserialize, serde::Serialize, Debug, Clone, PartialEq)]
@@ -192,12 +201,19 @@ impl NotesCollection {
         self.notes.len()
     }
 
-    pub fn try_get_note(&self, id: &Uuid) -> Option<&NoteData> {
-        self.notes.get(id)
+    pub fn try_get_note(&self, note_id: &Uuid) -> Result<&NoteData, NotesCollectionError> {
+        self.notes
+            .get(note_id)
+            .ok_or(NotesCollectionError::NoteNotFound(*note_id))
     }
 
-    pub fn try_get_note_mut(&mut self, id: &Uuid) -> Option<&mut NoteData> {
-        self.notes.get_mut(id)
+    pub fn try_get_note_mut(
+        &mut self,
+        note_id: &Uuid,
+    ) -> Result<&mut NoteData, NotesCollectionError> {
+        self.notes
+            .get_mut(note_id)
+            .ok_or(NotesCollectionError::NoteNotFound(*note_id))
     }
 
     pub fn for_each_note_mut<F>(&mut self, f: F)
@@ -232,13 +248,18 @@ impl NotesCollection {
         }
     }
 
-    pub fn try_restore_deleted_note(&mut self, note_id: Uuid) -> Option<&NoteData> {
+    pub fn try_restore_deleted_note(
+        &mut self,
+        note_id: Uuid,
+    ) -> Result<&NoteData, NotesCollectionError> {
         if let Some((id, note)) = self.deleted_notes.remove_entry(&note_id) {
             self.is_dirty = true;
             self.notes.insert(id, note);
-            self.notes.get(&id)
+            self.notes
+                .get(&id)
+                .ok_or(NotesCollectionError::NoteNotFound(note_id))
         } else {
-            None
+            Err(NotesCollectionError::NoteNotFound(note_id))
         }
     }
 
@@ -259,18 +280,24 @@ impl NotesCollection {
             .collect()
     }
 
-    pub fn try_get_default_style(&self) -> Option<&NoteStyle> {
-        self.styles.get(&self.default_style)
+    pub fn try_get_default_style(&self) -> Result<&NoteStyle, NotesCollectionError> {
+        self.styles
+            .get(&self.default_style)
+            .ok_or(NotesCollectionError::StyleNotFound(self.default_style))
     }
 
-    pub fn try_get_default_style_index(&self) -> Option<usize> {
+    pub fn try_get_default_style_index(&self) -> Result<usize, NotesCollectionError> {
         self.styles
             .keys()
             .enumerate()
             .find_map(|(index, style_id)| (*style_id == self.default_style).then_some(index))
+            .ok_or(NotesCollectionError::StyleNotFound(self.default_style))
     }
 
-    pub fn try_set_default_style_by_index(&mut self, style_index: usize) -> bool {
+    pub fn try_set_default_style_by_index(
+        &mut self,
+        style_index: usize,
+    ) -> Result<(), NotesCollectionError> {
         self.styles
             .keys()
             .nth(style_index)
@@ -280,15 +307,22 @@ impl NotesCollection {
                     self.is_dirty = true;
                 }
             })
-            .is_some()
+            .ok_or(NotesCollectionError::StyleIndexNotFound(style_index))
     }
 
-    pub fn try_get_style(&self, style_id: &Uuid) -> Option<&NoteStyle> {
-        self.styles.get(style_id)
+    pub fn try_get_style(&self, style_id: &Uuid) -> Result<&NoteStyle, NotesCollectionError> {
+        self.styles
+            .get(style_id)
+            .ok_or(NotesCollectionError::StyleNotFound(*style_id))
     }
 
-    pub fn try_get_style_mut(&mut self, style_id: &Uuid) -> Option<&mut NoteStyle> {
-        self.styles.get_mut(style_id)
+    pub fn try_get_style_mut(
+        &mut self,
+        style_id: &Uuid,
+    ) -> Result<&mut NoteStyle, NotesCollectionError> {
+        self.styles
+            .get_mut(style_id)
+            .ok_or(NotesCollectionError::StyleNotFound(*style_id))
     }
 
     pub fn for_each_style_mut<F>(&mut self, f: F)
@@ -300,7 +334,7 @@ impl NotesCollection {
 
     pub fn new_style(&mut self, name: String) -> Uuid {
         let id = Uuid::new_v4();
-        let new_style = if let Some(source) = self.try_get_default_style() {
+        let new_style = if let Ok(source) = self.try_get_default_style() {
             NoteStyle::new(
                 name,
                 source.get_font_name().to_string(),
@@ -313,40 +347,67 @@ impl NotesCollection {
         id
     }
 
+    pub fn delete_style(&mut self, style_id: Uuid) -> Result<(), NotesCollectionError> {
+        if self.styles.len() < 2 {
+            Err(NotesCollectionError::DeleteLastStyle)
+        } else if self.styles.remove(&style_id).is_some() {
+            self.is_dirty = true;
+            // if default style is being deleted select another one as default
+            if style_id == self.default_style {
+                self.default_style = self.styles.keys().next().copied().unwrap_or_default();
+            }
+            // replace all existing notes style if it is being deleted
+            let default_style = self.default_style;
+            self.for_each_note_mut(|note| {
+                if note.style() == style_id {
+                    note.set_style(default_style);
+                }
+            });
+            Ok(())
+        } else {
+            Err(NotesCollectionError::StyleNotFound(style_id))
+        }
+    }
+
     // operations with particular note style
 
-    pub fn try_get_note_style(&self, note_id: Uuid) -> Option<&NoteStyle> {
+    pub fn try_get_note_style(&self, note_id: Uuid) -> Result<&NoteStyle, NotesCollectionError> {
         // the first, search among live notes
         self.try_get_note(&note_id)
             .and_then(|note| self.try_get_style(&note.style()))
             // otherwise search in deleted notes
-            .or_else(|| {
-                self.iter_deleted_notes().find_map(|(id, note)| {
-                    (*id == note_id)
-                        .then_some(self.try_get_style(&note.style()))
-                        .flatten()
-                })
+            .or_else(|_| {
+                self.iter_deleted_notes()
+                    .find_map(|(id, note)| {
+                        (*id == note_id).then_some(self.try_get_style(&note.style()))
+                    })
+                    .ok_or(NotesCollectionError::NoteNotFound(note_id))
+                    .flatten()
             })
             // at the end return default style
-            .or_else(|| self.try_get_default_style())
+            .or_else(|_| self.try_get_default_style())
     }
 
-    pub fn try_get_note_style_index(&self, note_id: Uuid) -> Option<usize> {
+    pub fn try_get_note_style_index(&self, note_id: Uuid) -> Result<usize, NotesCollectionError> {
         self.try_get_note(&note_id).and_then(|note| {
             self.styles
                 .keys()
                 .enumerate()
                 .find_map(|(index, id)| (*id == note.style()).then_some(index))
+                .ok_or(NotesCollectionError::StyleNotFound(note.style()))
         })
     }
 
-    pub fn try_set_note_style_by_index(&mut self, note_id: Uuid, style_index: usize) -> bool {
+    pub fn try_set_note_style_by_index(
+        &mut self,
+        note_id: Uuid,
+        style_index: usize,
+    ) -> Result<(), NotesCollectionError> {
         if let Some(style_id) = self.styles.keys().nth(style_index).copied() {
             self.try_get_note_mut(&note_id)
                 .map(|note| note.set_style(style_id))
-                .is_some()
         } else {
-            false
+            Err(NotesCollectionError::StyleIndexNotFound(style_index))
         }
     }
 
@@ -427,7 +488,7 @@ fn create_read_update_delete_restore_operations() {
     assert_eq!(collection.get_notes_count(), 2);
     // get mutable ref to note
     let note_mut = collection.try_get_note_mut(&note_id);
-    assert!(note_mut.is_some());
+    assert!(note_mut.is_ok());
     let note_mut = note_mut.unwrap();
     // note is not changed
     assert!(!note_mut.is_changed());
@@ -453,7 +514,7 @@ fn create_read_update_delete_restore_operations() {
     assert_eq!(collection.iter_deleted_notes().count(), 1);
     // restore note
     let result = collection.try_restore_deleted_note(note_id);
-    assert!(result.is_some());
+    assert!(result.is_ok());
     // collection is changed
     assert!(collection.is_unsaved());
     // no more notes to restore

@@ -30,7 +30,8 @@ pub fn build_restore_view<'a>(
                             note,
                             notes
                                 .try_get_note_style(*note_id)
-                                .map(NoteStyle::get_background_color),
+                                .map(NoteStyle::get_background_color)
+                                .ok(),
                             icons,
                             icon_size,
                         ),
