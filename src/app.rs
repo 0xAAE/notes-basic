@@ -560,6 +560,17 @@ impl cosmic::Application for AppModel {
         }
     }
 
+    /// Called when the escape key is pressed.
+    fn on_escape(&mut self) -> Task<cosmic::Action<Self::Message>> {
+        if let Some(window_id) = self.core.focused_window()
+            && let Some(window) = self.sticky_windows.get_mut(&window_id)
+            && let Err(e) = window.finish_edit()
+        {
+            eprintln!("Erro while cancelling edit: {e}");
+        }
+        Task::none()
+    }
+
     fn style(&self) -> Option<cosmic::iced_runtime::Appearance> {
         Some(applet::style())
     }
