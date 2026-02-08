@@ -1,6 +1,5 @@
-use super::utils::with_background;
+use super::{service::Message, utils::with_background};
 use crate::{
-    app::Message,
     fl,
     icons::IconSet,
     notes::{NoteStyle, NotesCollection},

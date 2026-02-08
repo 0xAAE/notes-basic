@@ -1,8 +1,13 @@
 // SPDX-License-Identifier: MPL-2.0
 
-use notes_basic::{app::ServiceModel, i18n};
+use notes_basic::{
+    app::{ServiceFlags, ServiceModel},
+    i18n,
+};
 
 fn main() -> cosmic::iced::Result {
+    tracing_subscriber::fmt::init();
+
     // Get the system's preferred languages.
     let requested_languages = i18n_embed::DesktopLanguageRequester::requested_languages();
 
@@ -16,8 +21,11 @@ fn main() -> cosmic::iced::Result {
                 .min_width(300.0)
                 .min_height(200.0),
         )
+        .debug(true)
+        .exit_on_close(false)
         .no_main_window(true);
 
     // Starts the application's event loop with `()` as the application's flags.
-    cosmic::app::run::<ServiceModel>(settings, ())
+    //cosmic::app::run::<ServiceModel>(settings, ServiceFlags)
+    cosmic::app::run_single_instance::<ServiceModel>(settings, ServiceFlags)
 }

@@ -1,6 +1,9 @@
-use crate::{app::Message, config::Config, fl, icons};
+use std::collections::HashMap;
+
+use crate::{app::Command, config::Config, fl, icons};
 use cosmic::{
     applet,
+    dbus_activation::DbusActivationInterfaceProxy,
     iced::{
         self, Alignment, Subscription,
         widget::column,
@@ -10,10 +13,24 @@ use cosmic::{
 };
 use cosmic::{iced::Limits, prelude::*};
 
+/// Messages emitted by the application and its widgets.
+#[derive(Debug, Clone)]
+pub enum Message {
+    UpdateConfig(Config),
+    TogglePopup,
+    Signal(Command),
+    SignalSent(Command),
+    ZbusConnection(zbus::Result<zbus::Connection>),
+    DbusProxy(zbus::Result<DbusActivationInterfaceProxy<'static>>),
+}
+
 pub struct AppletModel {
     // Application state which is managed by the COSMIC runtime.
     core: cosmic::Core,
     main_popup_id: Option<Id>,
+    zbus_connection: Option<zbus::Connection>,
+    dbus_proxy: Option<DbusActivationInterfaceProxy<'static>>,
+    dbus_object_path: String,
     #[cfg(not(feature = "xdg_icons"))]
     icons: icons::IconSet,
     #[cfg(feature = "xdg_icons")]
@@ -32,7 +49,7 @@ impl cosmic::Application for AppletModel {
     type Message = Message;
 
     /// Unique identifier in RDNN (reverse domain name notation) format.
-    const APP_ID: &'static str = "dev.0xaae.notes-basic";
+    const APP_ID: &'static str = "dev.aae.notes";
 
     fn core(&self) -> &cosmic::Core {
         &self.core
@@ -50,11 +67,18 @@ impl cosmic::Application for AppletModel {
         // Construct the app model with the runtime's core.
         let app = Self {
             core,
+            zbus_connection: None,
+            dbus_proxy: None,
+            dbus_object_path: format!("/{}", Self::APP_ID.replace('.', "/")),
             main_popup_id: None,
             icons: icons::IconSet::new(),
         };
 
-        (app, Task::none())
+        let zbus_session_cmd = Task::perform(zbus::Connection::session(), |res| {
+            cosmic::Action::App(Message::ZbusConnection(res))
+        });
+
+        (app, zbus_session_cmd)
     }
 
     /// Describes the interface based on the current state of the application model.
@@ -139,46 +163,35 @@ impl cosmic::Application for AppletModel {
                 );
             }
 
-            Message::LoadNotes => {
-                println!("load notes");
+            Message::ZbusConnection(Err(e)) => {
+                tracing::error!("failed to connect to session dbus: {e}");
             }
 
-            Message::SaveNotes => {
-                println!("save notes");
+            Message::ZbusConnection(Ok(conn)) => {
+                tracing::info!("established connection to dbus");
+                self.zbus_connection = Some(conn);
+                return self.try_build_dbus_proxy();
             }
 
-            Message::ImportNotes => {
-                println!("import notes");
+            Message::DbusProxy(Err(e)) => {
+                tracing::error!("failed building dbus proxy: {e}");
             }
 
-            Message::ExportNotes => {
-                println!("export notes");
+            Message::DbusProxy(Ok(proxy)) => {
+                tracing::info!("successfully built dbus proxy client");
+                self.dbus_proxy = Some(proxy);
             }
 
-            Message::SetAllVisible(flag) => {
-                println!("set notes visibility: {flag}");
+            Message::Signal(command) => {
+                tracing::debug!("requested {:?}", command);
+                return self.send_command_via_dbus(command);
             }
 
-            Message::LockAll => {
-                println!("lock all notes");
-            }
-
-            Message::RestoreNotes => {
-                println!("restore notes");
-            }
-
-            Message::OpenSettings => {
-                println!("open settings");
-            }
-
-            Message::Quit => {
-                //TODO: send "quit" to service
-                println!("quit");
-                return iced::exit();
-            }
-
-            _ => {
-                eprintln!("unexpected message {message:?}");
+            Message::SignalSent(command) => {
+                tracing::debug!("successfully sent {command:?}");
+                if let Command::Quit = command {
+                    return iced::exit();
+                }
             }
         }
         Task::none()
@@ -198,30 +211,36 @@ impl AppletModel {
         // let restore_avail = self.notes.iter_deleted_notes().next().is_some();
 
         let save_load = column![
-            applet::menu_button(widget::text::body(fl!("load"))).on_press(Message::LoadNotes),
-            applet::menu_button(widget::text::body(fl!("save"))).on_press(Message::SaveNotes),
+            applet::menu_button(widget::text::body(fl!("load")))
+                .on_press(Message::Signal(Command::LoadNotes)),
+            applet::menu_button(widget::text::body(fl!("save")))
+                .on_press(Message::Signal(Command::SaveNotes)),
         ];
 
         let import_export = column![
-            applet::menu_button(widget::text::body(fl!("import"))).on_press(Message::ImportNotes),
-            applet::menu_button(widget::text::body(fl!("export"))).on_press(Message::ExportNotes),
+            applet::menu_button(widget::text::body(fl!("import")))
+                .on_press(Message::Signal(Command::ImportNotes)),
+            applet::menu_button(widget::text::body(fl!("export")))
+                .on_press(Message::Signal(Command::ExportNotes)),
         ];
 
         let show_lock = column![
             applet::menu_button(widget::text::body(fl!("hide-all")))
-                .on_press(Message::SetAllVisible(false)),
+                .on_press(Message::Signal(Command::ShowAllNotes)),
             applet::menu_button(widget::text::body(fl!("show-all")))
-                .on_press(Message::SetAllVisible(true)),
-            applet::menu_button(widget::text::body(fl!("lock-all"))).on_press(Message::LockAll),
+                .on_press(Message::Signal(Command::HideAllNotes)),
+            applet::menu_button(widget::text::body(fl!("lock-all")))
+                .on_press(Message::Signal(Command::LockAll)),
         ];
 
         let settings_restore = column![
             applet::menu_button(widget::text::body(fl!("restore-notes")))
-                .on_press(Message::RestoreNotes),
+                .on_press(Message::Signal(Command::RestoreNotes)),
             applet::menu_button(widget::text::body(fl!("settings")))
-                .on_press(Message::OpenSettings),
+                .on_press(Message::Signal(Command::OpenSettings)),
             //TODO: add "about" item
-            applet::menu_button(widget::text::body(fl!("quit"))).on_press(Message::Quit),
+            applet::menu_button(widget::text::body(fl!("quit")))
+                .on_press(Message::Signal(Command::Quit)),
         ];
 
         let spacing = cosmic::theme::spacing();
@@ -246,5 +265,46 @@ impl AppletModel {
             .max_height(500.)
             .max_width(500.)
             .into()
+    }
+
+    fn try_build_dbus_proxy(&self) -> Task<cosmic::Action<Message>> {
+        if let Some(zbus_conn) = self.zbus_connection.clone() {
+            tracing::info!("try building proxy client");
+            let path = self.dbus_object_path.clone();
+            match DbusActivationInterfaceProxy::builder(&zbus_conn)
+                .destination(<Self as cosmic::Application>::APP_ID)
+                //.ok()
+                .and_then(|b| b.path(path))
+                .and_then(|b| b.destination(<Self as cosmic::Application>::APP_ID))
+            {
+                Ok(proxy_builder) => {
+                    return Task::perform(async move { proxy_builder.build().await }, |res| {
+                        cosmic::Action::App(Message::DbusProxy(res))
+                    });
+                }
+                Err(e) => tracing::error!("failed building dbus proxy client: {e}"),
+            }
+        } else {
+            tracing::info!("failed building dbus proxy client: connection is not establlished yet");
+        }
+        Task::none()
+    }
+
+    fn send_command_via_dbus(&self, command: Command) -> Task<cosmic::Action<Message>> {
+        if let Some(mut proxy) = self.dbus_proxy.clone() {
+            let command_str = command.to_string();
+            return Task::future(async move {
+                if let Err(e) = proxy
+                    .activate_action(command_str.as_str(), Vec::new(), HashMap::new())
+                    .await
+                {
+                    tracing::error!("failed sending {command_str}: {e}");
+                } else {
+                    tracing::info!("sent {command_str} successfully");
+                }
+                cosmic::Action::App(Message::SignalSent(command))
+            });
+        }
+        Task::none()
     }
 }

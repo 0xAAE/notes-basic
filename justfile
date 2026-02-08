@@ -25,9 +25,11 @@ desktop-dst := base-dir / 'share' / 'applications' / desktop
 icons-dst := base-dir / 'share' / 'icons' / 'hicolor'
 icon-svg-dst := icons-dst / 'scalable' / 'apps'
 
+log-tracing := 'debug,wgpu=warn,iced_wgpu=warn,iced_graphics=warn,calloop=warn,cosmic_text=warn'
+
 # Default recipe
 default:
-    env RUST_BACKTRACE=full cargo run --bin notes-service
+    env RUST_BACKTRACE=full RUST_LOG={{log-tracing}} cargo run --bin notes-service
 
 # Runs `cargo clean`
 clean:
@@ -59,7 +61,7 @@ check-json: (check '--message-format=json')
 
 # Run the application for testing purposes
 run *args:
-    env RUST_BACKTRACE=full cargo run --release {{args}}
+    env RUST_BACKTRACE=full RUST_LOG={{log-tracing}} cargo run --release {{args}}
 
 # Installs files
 install:
@@ -105,4 +107,4 @@ deb *args: (build-debug args)
 
 # Run the application for debugging purposes
 rund *args:
-    env RUST_BACKTRACE=full cargo run --bin {{args}}
+    env RUST_BACKTRACE=full RUST_LOG={{log-tracing}} cargo run --bin {{args}}

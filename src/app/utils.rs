@@ -1,4 +1,4 @@
-use crate::app::Message;
+use super::service::Message;
 use cosmic::prelude::*;
 use cosmic::{
     iced::{self, Color},

@@ -2,7 +2,7 @@
 
 use crate::{
     app::{
-        Message,
+        Command,
         edit_style::EditStyleDialog,
         restore_view::build_restore_view,
         settings_view::build_settings_view,
@@ -15,8 +15,10 @@ use crate::{
 };
 use cosmic::prelude::*;
 use cosmic::{
+    app::CosmicFlags,
     applet,
     cosmic_config::{self, ConfigSet, CosmicConfigEntry},
+    dbus_activation,
     iced::{
         self, Color, Event, Point, Size, Subscription,
         core::mouse::Button as MouseButton,
@@ -26,8 +28,62 @@ use cosmic::{
     },
     widget,
 };
-use std::collections::HashMap;
+use std::{collections::HashMap, str::FromStr};
 use uuid::Uuid;
+
+pub struct ServiceFlags;
+
+impl CosmicFlags for ServiceFlags {
+    type SubCommand = usize;
+    type Args = Vec<String>;
+}
+
+/// Messages emitted by the application and its widgets.
+#[derive(Debug, Clone)]
+pub enum Message {
+    // Applet menu commands
+    Signal(Command),
+    UpdateConfig(Config),
+    // Windows
+    StickyWindowCreated(Id, Uuid), // (window_id, note_id)
+    RestoreWindowCreated(Id),
+    SettingsWindowCreated(Id),
+    EditStyleWindowCreated(Id, Uuid), // (window_id, style_id)
+    // settings actions
+    SetDefaultStyle(usize), // set deafault style by index
+    // notes collection load result shared for Load and Import
+    LoadNotesCompleted(NotesCollection),
+    LoadNotesFailed(String), // error message
+    // export notes result
+    ExportNotesCompleted,
+    ExportNotesFailed(String), // error message
+    // redirect editor actions to the edit context
+    Edit(Id, widget::text_editor::Action),
+    // iced "system" events handling
+    AppWindowEvent((Id, WindowEvent)),
+    AppMouseEvent((Id, MouseEvent)),
+    // dbus event handling
+    DbusActivation(dbus_activation::Message),
+    Ignore, // Ignorable alternative to DbusActivation
+    // response on window::get_position() request
+    WindowPositionResponse((Id, Option<Point>)),
+    // note image button actions
+    NoteLock(Id, bool),          // lock / unlock note
+    NoteEdit(Id, bool),          // edit / save note content
+    NoteStyle(Id),               // select style (background, font) for sticky window
+    NoteSyleSelected(Id, usize), // style (background, font) for sticky window was selected by index in styles collection
+    NoteNew,                     // create new note with default syle and begin edit
+    NoteDelete(Id),              // delete note
+    NoteRestore(Uuid),           // restore note
+    // styles view button actions
+    StyleNew,               // add new style
+    StyleEdit(Uuid),        // edit style by style_id
+    StyleDelete(Uuid),      // delete style by style_id
+    EditStyleUpdate,        // Ok was pressed in edit style dialog
+    EditStyleCancel,        // Cancel was pressed in edit style dialog
+    InputStyleName(String), // update currently edited style name
+    ColorUpdate(widget::color_picker::ColorPickerUpdate),
+}
 
 /// The application model stores app-specific state used to describe its interface and
 /// drive its logic.
@@ -57,13 +113,13 @@ impl cosmic::Application for ServiceModel {
     type Executor = cosmic::executor::Default;
 
     /// Data that your application receives to its init method.
-    type Flags = ();
+    type Flags = ServiceFlags;
 
     /// Messages which the application and its widgets will emit.
     type Message = Message;
 
     /// Unique identifier in RDNN (reverse domain name notation) format.
-    const APP_ID: &'static str = "dev.0xaae.notes-basic";
+    const APP_ID: &'static str = "dev.aae.notes";
 
     fn core(&self) -> &cosmic::Core {
         &self.core
@@ -84,7 +140,7 @@ impl cosmic::Application for ServiceModel {
                 Ok(config) => config,
                 Err((errors, config)) => {
                     for why in errors {
-                        eprintln!("error loading app config: {why}");
+                        tracing::error!("error loading app config: {why}");
                         //tracing::error!(%why, "error loading app config");
                     }
                     config
@@ -128,11 +184,7 @@ impl cosmic::Application for ServiceModel {
     /// Application events will be processed through the view. Any messages emitted by
     /// events received by widgets will be passed to the update method.
     fn view(&self) -> Element<'_, Self::Message> {
-        self.core
-            .applet
-            .icon_button_from_handle(self.icons.notes())
-            .on_press_down(Message::TogglePopup)
-            .into()
+        widget::text(fl!("problem-text")).into()
     }
 
     /// Constructs views for other windows.
@@ -223,8 +275,21 @@ impl cosmic::Application for ServiceModel {
                 }
                 _ => None,
             }),
+            dbus_activation::subscription::<ServiceModel>().map(|evt| match evt {
+                cosmic::Action::DbusActivation(msg) => Message::DbusActivation(msg),
+                _ => Message::Ignore,
+            }),
         ];
         Subscription::batch(subscriptions)
+    }
+
+    /// Handles dbus activation messages
+    fn dbus_activation(
+        &mut self,
+        msg: dbus_activation::Message,
+    ) -> Task<cosmic::Action<Self::Message>> {
+        tracing::debug!("dbus_activation() got {msg:?}");
+        Self::on_dbus_activation_message(msg)
     }
 
     /// Handles messages emitted by the application and its widgets.
@@ -234,63 +299,24 @@ impl cosmic::Application for ServiceModel {
     #[allow(clippy::too_many_lines)]
     fn update(&mut self, message: Self::Message) -> Task<cosmic::Action<Self::Message>> {
         match message {
+            Message::Signal(command) => {
+                return self.on_signal(&command);
+            }
+
             Message::UpdateConfig(config) => {
                 self.config = config;
             }
 
-            Message::Quit => {
-                self.on_quit();
-                return iced::exit();
+            Message::DbusActivation(msg) => {
+                tracing::debug!("update() got {msg:?}");
+                return Self::on_dbus_activation_message(msg);
             }
 
-            // messages related to loading and saving notes
-            Message::LoadNotes => {
-                if self.notes.is_unsaved() {
-                    // todo: ask to overwrite unsaved notes
-                    eprintln!("drop unsaved changes while loading collection");
-                }
-                self.notes = Self::load_notes_or_default(&self.config);
-            }
-
-            Message::SaveNotes => {
-                //todo: stop edititng all sticky windows or ask user
-                if let Err(e) = self.save_notes() {
-                    eprintln!("Failed saving notes: {e}");
-                }
-            }
-
-            Message::ImportNotes => {
-                if self.notes.is_unsaved() {
-                    // todo: ask to overwrite unsaved notes
-                    eprintln!("drop unsaved changes while importing collection");
-                }
-                let import_file = self.config.import_file.clone();
-                // opposite to other cases return real task instead of none()
-                return cosmic::task::future(Self::import_notes(import_file));
-            }
-
-            Message::ExportNotes => {
-                //todo: stop edititng all sticky windows (?) or ask user about
-                let export_file = self.config.import_file.clone();
-                let notes = self.notes.clone();
-                return cosmic::task::future(Self::export_notes(export_file, notes));
-            }
-
-            Message::SetAllVisible(on) => {
-                return self.on_change_notes_visibility(on);
-            }
-
-            Message::LockAll => {
-                self.notes.for_each_note_mut(|note| note.set_locking(true));
-            }
-
-            Message::RestoreNotes => {
-                return self.spawn_restore_notes_window();
-            }
+            Message::Ignore => {}
 
             Message::SetDefaultStyle(style_index) => {
                 if let Err(e) = self.notes.try_set_default_style_by_index(style_index) {
-                    eprintln!("failed changing default style: {e}");
+                    tracing::error!("failed changing default style: {e}");
                 }
             }
 
@@ -300,15 +326,15 @@ impl cosmic::Application for ServiceModel {
             }
 
             Message::LoadNotesFailed(msg) => {
-                eprintln!("failed loading notes: {msg}");
+                tracing::error!("failed loading notes: {msg}");
             }
 
             Message::ExportNotesCompleted => {
-                // nothing to do for now
+                tracing::debug!("export completed successfully");
             }
 
             Message::ExportNotesFailed(msg) => {
-                eprintln!("failed exporting notes: {msg}");
+                tracing::error!("failed exporting notes: {msg}");
             }
 
             // message related to windows management
@@ -347,7 +373,7 @@ impl cosmic::Application for ServiceModel {
                 if let Some(sticky_window) = self.sticky_windows.get_mut(&window_id)
                     && let Err(e) = sticky_window.do_edit_action(action)
                 {
-                    eprintln!("failed perform edit: {e}");
+                    tracing::error!("failed perform edit: {e}");
                 }
             }
 
@@ -363,7 +389,7 @@ impl cosmic::Application for ServiceModel {
                 if let Some(point) = location {
                     match self.try_get_note_mut(id) {
                         Ok(note) => note.set_position(to_usize(point.x), to_usize(point.y)),
-                        Err(e) => eprintln!("Failed to update position: {e}"),
+                        Err(e) => tracing::error!("failed to update position: {e}"),
                     }
                 }
             }
@@ -384,7 +410,7 @@ impl cosmic::Application for ServiceModel {
                 if let Some(sticky_window) = self.sticky_windows.get_mut(&id) {
                     sticky_window.allow_select_style(self.notes.get_style_names());
                 } else {
-                    eprintln!("{id}: sticky window is not found to change style");
+                    tracing::error!("{id}: sticky window is not found to change style");
                 }
             }
 
@@ -431,7 +457,7 @@ impl cosmic::Application for ServiceModel {
             Message::EditStyleCancel => {
                 if let Some((window_id, dialog)) = self.edit_style.take() {
                     if let Err(e) = self.notes.delete_style(dialog.get_id()) {
-                        eprintln!("Failed to delete new style: {e}");
+                        tracing::error!("failed to delete new style: {e}");
                     }
                     return window::close(window_id);
                 }
@@ -448,14 +474,6 @@ impl cosmic::Application for ServiceModel {
                     return dialog.on_color_picker_update(event);
                 }
             }
-
-            Message::OpenSettings => {
-                return Self::spawn_settings_window();
-            }
-
-            Message::TogglePopup => {
-                eprintln!("unexpected message {message:?}");
-            }
         }
         Task::none()
     }
@@ -467,7 +485,7 @@ impl cosmic::Application for ServiceModel {
                 Ok(note) => {
                     note.set_size(to_usize(width), to_usize(height));
                 }
-                Err(e) => eprintln!("Failed to update sticky window size: {e}"),
+                Err(e) => tracing::error!("failed to update sticky window size: {e}"),
             }
         }
     }
@@ -478,7 +496,7 @@ impl cosmic::Application for ServiceModel {
             && let Some(window) = self.sticky_windows.get_mut(&window_id)
             && let Err(e) = window.finish_edit()
         {
-            eprintln!("Erro while cancelling edit: {e}");
+            tracing::error!("failed cancelling edit: {e}");
         }
         Task::none()
     }
@@ -489,22 +507,109 @@ impl cosmic::Application for ServiceModel {
 }
 
 impl ServiceModel {
+    fn on_signal(&mut self, command: &Command) -> Task<cosmic::Action<Message>> {
+        match command {
+            Command::Quit => {
+                self.on_quit();
+                return iced::exit();
+            }
+
+            // messages related to loading and saving notes
+            Command::LoadNotes => {
+                if self.notes.is_unsaved() {
+                    // todo: ask to overwrite unsaved notes
+                    tracing::error!("drop unsaved changes while loading collection");
+                }
+                self.notes = Self::load_notes_or_default(&self.config);
+            }
+
+            Command::SaveNotes => {
+                //todo: stop edititng all sticky windows or ask user
+                if let Err(e) = self.save_notes() {
+                    tracing::error!("failed saving notes: {e}");
+                }
+            }
+
+            Command::ImportNotes => {
+                if self.notes.is_unsaved() {
+                    // todo: ask to overwrite unsaved notes
+                    tracing::error!("drop unsaved changes while importing collection");
+                }
+                let import_file = self.config.import_file.clone();
+                // opposite to other cases return real task instead of none()
+                return cosmic::task::future(Self::import_notes(import_file));
+            }
+
+            Command::ExportNotes => {
+                //todo: stop edititng all sticky windows (?) or ask user about
+                let export_file = self.config.import_file.clone();
+                let notes = self.notes.clone();
+                return cosmic::task::future(Self::export_notes(export_file, notes));
+            }
+
+            Command::ShowAllNotes => {
+                return self.on_change_notes_visibility(true);
+            }
+
+            Command::HideAllNotes => {
+                return self.on_change_notes_visibility(false);
+            }
+
+            Command::LockAll => {
+                self.notes.for_each_note_mut(|note| note.set_locking(true));
+            }
+
+            Command::RestoreNotes => {
+                return self.spawn_restore_notes_window();
+            }
+
+            Command::OpenSettings => {
+                return Self::spawn_settings_window();
+            }
+        }
+
+        Task::none()
+    }
+
+    #[allow(clippy::single_match)]
+    fn on_dbus_activation_message(msg: dbus_activation::Message) -> Task<cosmic::Action<Message>> {
+        match msg.msg {
+            dbus_activation::Details::ActivateAction {
+                action: action_name,
+                args: _,
+            } => {
+                tracing::info!("handling {}", &action_name);
+                match Command::from_str(action_name.as_str()) {
+                    Ok(cmd) => {
+                        return Task::done(cosmic::Action::App(Message::Signal(cmd)));
+                    }
+                    Err(e) => tracing::error!("{e}"),
+                }
+            }
+            // Other possible messages:
+            // dbus_activation::Details::Activate => todo!(),
+            // dbus_activation::Details::Open { url } => todo!(),
+            _ => {}
+        }
+        Task::none()
+    }
+
     fn on_quit(&mut self) {
         // save changes if any to persistent storage
         if self.notes.is_unsaved() {
             if let Err(e) = self.save_notes() {
-                eprintln!("Failed saving notes on exit: {e}");
+                tracing::error!("failed saving notes on exit: {e}");
             } else {
-                println!("Notes collection was changed, save");
+                tracing::info!("notes collection was changed, save");
             }
         } else {
-            println!("Notes collection is unchanged, skip saving");
+            tracing::info!("notes collection is unchanged, skip saving");
         }
         // warn if deleted notes were dropped
         let count_deleted = self.notes.iter_deleted_notes().count();
         if count_deleted > 0 {
             //TODO: what about saving deleted notes too? Maybe with their TTLs
-            println!("Finally drop deleted notes on exit: {count_deleted}");
+            tracing::warn!("completely drop some deleted notes on exit: {count_deleted}");
         }
     }
 
@@ -525,7 +630,7 @@ impl ServiceModel {
         } else {
             NotesCollection::try_read(&config.notes)
                 .map_err(|e| {
-                    eprintln!(
+                    tracing::error!(
                         "failed loading notes from {}/v{}/notes: {e}",
                         <Self as cosmic::Application>::APP_ID,
                         Config::VERSION
@@ -603,7 +708,7 @@ impl ServiceModel {
                 )
             }
             Err(e) => {
-                eprintln!("Failed to create new note: {e}");
+                tracing::error!("failed to create new note: {e}");
                 Task::none()
             }
         }
@@ -616,7 +721,7 @@ impl ServiceModel {
                 task
             }
             Err(e) => {
-                eprintln!("Failed to restore note: {e}");
+                tracing::error!("failed to restore note: {e}");
                 Task::none()
             }
         }
@@ -627,7 +732,7 @@ impl ServiceModel {
             Ok(note) => {
                 note.set_locking(is_on);
             }
-            Err(e) => eprintln!("Failed to change note locking: {e}"),
+            Err(e) => tracing::error!("failed to change note locking: {e}"),
         }
     }
 
@@ -645,10 +750,10 @@ impl ServiceModel {
             if let Ok(note) = self.notes.try_get_note(&sticky_window.get_note_id())
                 && let Err(e) = sticky_window.start_edit(note.get_content())
             {
-                eprintln!("[{window_id}] failed to start edit: {e}");
+                tracing::error!("[{window_id}] failed to start edit: {e}");
             }
         } else {
-            eprintln!("[{window_id}] failed to start edit: sticky window is not found");
+            tracing::error!("[{window_id}] failed to start edit: sticky window is not found");
         }
     }
 
@@ -657,11 +762,11 @@ impl ServiceModel {
             if let Ok(note) = self.notes.try_get_note_mut(&sticky_window.get_note_id()) {
                 match sticky_window.finish_edit() {
                     Ok(text) => note.set_content(text),
-                    Err(e) => eprintln!("[{window_id}] failed to finish edit: {e}"),
+                    Err(e) => tracing::error!("[{window_id}] failed to finish edit: {e}"),
                 }
             }
         } else {
-            eprintln!("[{window_id}] failed to finish edit: sticky window is not found");
+            tracing::error!("[{window_id}] failed to finish edit: sticky window is not found");
         }
     }
 
@@ -672,10 +777,10 @@ impl ServiceModel {
                 .notes
                 .try_set_note_style_by_index(sticky_window.get_note_id(), style_index)
             {
-                eprintln!("[{window_id}] Failed select style: {e}");
+                tracing::error!("[{window_id}] Failed select style: {e}");
             }
         } else {
-            eprintln!("[{window_id}] sticky window is not found to change style");
+            tracing::error!("[{window_id}] sticky window is not found to change style");
         }
     }
 
@@ -711,7 +816,7 @@ impl ServiceModel {
                     .for_each(StickyWindow::disable_select_style);
             }
             Err(e) => {
-                eprintln!("Failed to delete style: {e}");
+                tracing::error!("failed to delete style: {e}");
             }
         }
     }
@@ -723,7 +828,7 @@ impl ServiceModel {
                 style.set_font_name(font_name);
                 style.set_background_color(bgcolor);
             }
-            Err(e) => eprintln!("Failed to update style: {e}"),
+            Err(e) => tracing::error!("failed to update style: {e}"),
         }
     }
 
@@ -773,7 +878,7 @@ impl ServiceModel {
                         Ok(note) => {
                             note.set_position(to_usize(point.x), to_usize(point.y));
                         }
-                        Err(e) => eprintln!("Failed to update sticky window position: {e}"),
+                        Err(e) => tracing::error!("failed to update sticky window position: {e}"),
                     }
                 }
             }
