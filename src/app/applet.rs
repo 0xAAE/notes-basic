@@ -4,6 +4,7 @@ use crate::{app::Command, config::Config, fl, icons};
 use cosmic::{
     applet,
     dbus_activation::DbusActivationInterfaceProxy,
+    desktop,
     iced::{
         self, Alignment, Subscription,
         widget::column,
@@ -299,6 +300,13 @@ impl AppletModel {
                     .await
                 {
                     tracing::error!("failed sending {command_str}: {e}");
+                    desktop::spawn_desktop_exec(
+                        "/home/aae/dev/rust/cosmic-notes/notes-basic/target/debug/notes-service",
+                        Vec::<(String, String)>::new(),
+                        Some(<Self as cosmic::Application>::APP_ID),
+                        false,
+                    )
+                    .await;
                 } else {
                     tracing::info!("sent {command_str} successfully");
                 }
