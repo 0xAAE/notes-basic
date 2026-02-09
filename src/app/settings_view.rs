@@ -1,10 +1,10 @@
-use super::styles_view::build_styles_list_view;
-use crate::icons::IconSet;
-use crate::notes::NotesCollection;
-use crate::{app::Message, fl};
-use cosmic::iced::Alignment;
+use super::{service::Message, styles_view::build_styles_list_view};
+use crate::{fl, icons::IconSet, notes::NotesCollection};
 use cosmic::prelude::*;
-use cosmic::{iced::Length, widget};
+use cosmic::{
+    iced::{Alignment, Length},
+    widget,
+};
 
 pub fn build_settings_view<'a>(
     notes: &'a NotesCollection,
@@ -13,7 +13,7 @@ pub fn build_settings_view<'a>(
 ) -> Element<'a, Message> {
     let styles = notes.get_style_names();
     if styles.is_empty() {
-        eprintln!("Not any sticky window style is available");
+        tracing::error!("no any sticky window style is available");
         return widget::column::with_capacity(1)
             .push(widget::text(fl!("problem-text")))
             .width(Length::Fill)

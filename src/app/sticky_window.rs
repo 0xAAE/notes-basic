@@ -1,9 +1,9 @@
-use crate::{app::Message, fl, icons::IconSet, notes::NotesCollection};
+use super::service::Message;
+use crate::{fl, icons::IconSet, notes::NotesCollection};
 use cosmic::prelude::*;
-use cosmic::widget::text_editor::Action;
 use cosmic::{
     iced::{Length, window::Id},
-    widget,
+    widget::{self, text_editor::Action},
 };
 use thiserror::Error;
 use uuid::Uuid;
@@ -135,7 +135,7 @@ impl StickyWindow {
                             styles,
                             notes
                                 .try_get_note_style_index(self.note_id)
-                                .map_err(|e| eprintln!("Failed to get style index: {e}"))
+                                .map_err(|e| tracing::error!("failed to get style index: {e}"))
                                 .ok(),
                             move |index| Message::NoteSyleSelected(window_id, index),
                         )

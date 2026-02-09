@@ -1,4 +1,4 @@
-use super::{Message, utils::with_background};
+use super::{service::Message, utils::with_background};
 use crate::fl;
 use crate::notes::NoteStyle;
 use cosmic::iced::Length;

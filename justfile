@@ -1,7 +1,7 @@
 # Name of the application's binary.
 name := 'notes-basic'
 # The unique ID of the application.
-appid := 'com.github.aae.notes'
+appid := 'dev.aae.notes'
 
 # Path to root file system, which defaults to `/`.
 rootdir := ''
@@ -25,8 +25,13 @@ desktop-dst := base-dir / 'share' / 'applications' / desktop
 icons-dst := base-dir / 'share' / 'icons' / 'hicolor'
 icon-svg-dst := icons-dst / 'scalable' / 'apps'
 
-# Default recipe which runs `just build-release`
-default: rund
+applet := 'notes-applet'
+service := 'notes-service'
+log-tracing := 'warn,notes_basic=trace'
+
+# Default recipe
+default:
+    env RUST_BACKTRACE=full RUST_LOG={{log-tracing}} cargo run --bin {{applet}}
 
 # Runs `cargo clean`
 clean:
@@ -58,14 +63,14 @@ check-json: (check '--message-format=json')
 
 # Run the application for testing purposes
 run *args:
-    env RUST_BACKTRACE=full cargo run --release {{args}}
+    env RUST_BACKTRACE=full RUST_LOG={{log-tracing}} cargo run --release {{args}}
 
 # Installs files
 install:
     install -Dm0755 {{ cargo-target-dir / 'release' / name }} {{bin-dst}}
     install -Dm0644 {{ 'resources' / desktop }} {{desktop-dst}}
     install -Dm0644 {{ 'resources' / appdata }} {{appdata-dst}}
-    install -Dm0644 {{ 'resources' / 'icons' / 'hicolor' / 'scalable' / 'apps' / 'icon.svg' }} {{icon-svg-dst}}
+    install -Dm0644 {{ 'resources' / 'icons' / 'hicolor' / 'scalable' / 'apps' / 'notes.svg' }} {{icon-svg-dst}}
 
 # Uninstalls installed files
 uninstall:
@@ -97,11 +102,11 @@ tag version:
 # my manual additions
 
 # Compiles with release profile
-rel *args: (build-release args)
+rel *args: (build-release '--bin' args)
 
 # Compiles with debug profile
-deb *args: (build-debug args)
+dbg *args: (build-debug '--bin' args)
 
 # Run the application for debugging purposes
 rund *args:
-    env RUST_BACKTRACE=full cargo run {{args}}
+    env RUST_BACKTRACE=full RUST_LOG={{log-tracing}} cargo run --bin {{args}}

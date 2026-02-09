@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: MPL-2.0
-
 use cosmic::{
     cosmic_config::{self, CosmicConfigEntry, cosmic_config_derive::CosmicConfigEntry},
     iced::Size,
@@ -8,6 +7,7 @@ use cosmic::{
 use crate::app::to_f32;
 
 const DEF_DATA_FILE: &str = ".config/indicator-stickynotes";
+const DEF_SERVICE_BIN: &str = "/usr/local/bin/notes-service";
 const ICON_SIZE: u16 = 16;
 
 #[derive(Debug, Clone, CosmicConfigEntry, Eq, PartialEq)]
@@ -15,6 +15,7 @@ const ICON_SIZE: u16 = 16;
 pub struct Config {
     pub import_file: String,
     pub notes: String,
+    pub service_bin: String,
     pub restore_notes_width: usize,
     pub restore_notes_heigth: usize,
     pub edit_style_width: usize,
@@ -33,6 +34,7 @@ impl Default for Config {
                 },
             ),
             notes: String::new(),
+            service_bin: DEF_SERVICE_BIN.to_string(),
             restore_notes_width: 480,
             restore_notes_heigth: 400,
             edit_style_width: 480,
@@ -43,6 +45,7 @@ impl Default for Config {
 }
 
 impl Config {
+    #[must_use]
     pub fn restore_notes_size(&self) -> Size {
         Size::new(
             to_f32(self.restore_notes_width),
@@ -50,6 +53,7 @@ impl Config {
         )
     }
 
+    #[must_use]
     pub fn edit_style_size(&self) -> Size {
         Size::new(
             to_f32(self.edit_style_width),

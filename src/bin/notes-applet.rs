@@ -1,13 +1,10 @@
 // SPDX-License-Identifier: MPL-2.0
 
-mod app;
-mod config;
-mod i18n;
-mod icons;
-#[allow(dead_code)]
-mod notes;
+use notes_basic::{app::AppletModel, i18n};
 
 fn main() -> cosmic::iced::Result {
+    tracing_subscriber::fmt::init();
+
     // Get the system's preferred languages.
     let requested_languages = i18n_embed::DesktopLanguageRequester::requested_languages();
 
@@ -15,5 +12,5 @@ fn main() -> cosmic::iced::Result {
     i18n::init(&requested_languages);
 
     // Starts the application's event loop with `()` as the application's flags.
-    cosmic::applet::run::<app::AppModel>(())
+    cosmic::applet::run::<AppletModel>(())
 }
