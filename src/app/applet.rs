@@ -1,18 +1,19 @@
 use std::collections::HashMap;
 
 use crate::{app::Command, config::Config, fl, icons};
+use cosmic::prelude::*;
 use cosmic::{
     applet,
+    cosmic_config::{self, CosmicConfigEntry},
     dbus_activation::DbusActivationInterfaceProxy,
     desktop,
     iced::{
-        self, Alignment, Subscription,
+        self, Alignment, Limits, Subscription,
         widget::column,
         window::{self, Id},
     },
     widget,
 };
-use cosmic::{iced::Limits, prelude::*};
 
 /// Messages emitted by the application and its widgets.
 #[derive(Debug, Clone)]
@@ -20,7 +21,7 @@ pub enum Message {
     UpdateConfig(Config),
     TogglePopup,
     Signal(Command),
-    SignalSent(Command),
+    SignalResult(Command, bool), // (command, success or not)
     ZbusConnection(zbus::Result<zbus::Connection>),
     DbusProxy(zbus::Result<DbusActivationInterfaceProxy<'static>>),
 }
@@ -28,6 +29,8 @@ pub enum Message {
 pub struct AppletModel {
     // Application state which is managed by the COSMIC runtime.
     core: cosmic::Core,
+    // Configuration data that persists between application runs.
+    config: Config,
     main_popup_id: Option<Id>,
     zbus_connection: Option<zbus::Connection>,
     dbus_proxy: Option<DbusActivationInterfaceProxy<'static>>,
@@ -65,9 +68,23 @@ impl cosmic::Application for AppletModel {
         core: cosmic::Core,
         _flags: Self::Flags,
     ) -> (Self, Task<cosmic::Action<Self::Message>>) {
+        // Load config
+        let config = cosmic_config::Config::new(Self::APP_ID, Config::VERSION)
+            .map(|context| match Config::get_entry(&context) {
+                Ok(config) => config,
+                Err((errors, config)) => {
+                    for why in errors {
+                        tracing::error!("error loading app config: {why}");
+                    }
+                    config
+                }
+            })
+            .unwrap_or_default();
+
         // Construct the app model with the runtime's core.
         let app = Self {
             core,
+            config,
             zbus_connection: None,
             dbus_proxy: None,
             dbus_object_path: format!("/{}", Self::APP_ID.replace('.', "/")),
@@ -118,10 +135,9 @@ impl cosmic::Application for AppletModel {
             self.core()
                 .watch_config::<Config>(Self::APP_ID)
                 .map(|update| {
-                    // for why in update.errors {
-                    //     tracing::error!(?why, "app config error");
-                    // }
-
+                    for e in update.errors {
+                        tracing::error!("config error: {e}");
+                    }
                     Message::UpdateConfig(update.config)
                 }),
         ];
@@ -135,8 +151,8 @@ impl cosmic::Application for AppletModel {
     #[allow(clippy::too_many_lines)]
     fn update(&mut self, message: Self::Message) -> Task<cosmic::Action<Self::Message>> {
         match message {
-            Message::UpdateConfig(_config) => {
-                // self.config = config;
+            Message::UpdateConfig(config) => {
+                self.config = config;
             }
 
             Message::TogglePopup => {
@@ -179,18 +195,27 @@ impl cosmic::Application for AppletModel {
             }
 
             Message::DbusProxy(Ok(proxy)) => {
-                tracing::info!("successfully built dbus proxy client");
+                tracing::info!(
+                    "successfully built dbus proxy client, testing service availability then"
+                );
                 self.dbus_proxy = Some(proxy);
+                // test service availability, this will try to launch service if unavailable:
+                return self.send_command_via_dbus(Command::Ping);
             }
 
             Message::Signal(command) => {
-                tracing::debug!("requested {:?}", command);
+                tracing::debug!("requested {command}");
                 return self.send_command_via_dbus(command);
             }
 
-            Message::SignalSent(command) => {
-                tracing::debug!("successfully sent {command:?}");
+            Message::SignalResult(command, success) => {
+                if success {
+                    tracing::debug!("successfully sent {command}");
+                } else {
+                    tracing::warn!("failed sending {command}");
+                }
                 if let Command::Quit = command {
+                    tracing::info!("finish working itself");
                     return iced::exit();
                 }
             }
@@ -294,23 +319,26 @@ impl AppletModel {
     fn send_command_via_dbus(&self, command: Command) -> Task<cosmic::Action<Message>> {
         if let Some(mut proxy) = self.dbus_proxy.clone() {
             let command_str = command.to_string();
+            let service_exec = self.config.service_bin.clone();
             return Task::future(async move {
                 if let Err(e) = proxy
                     .activate_action(command_str.as_str(), Vec::new(), HashMap::new())
                     .await
                 {
                     tracing::error!("failed sending {command_str}: {e}");
+                    tracing::info!("trying to launch notes-service binary: {}", &service_exec);
                     desktop::spawn_desktop_exec(
-                        "/home/aae/dev/rust/cosmic-notes/notes-basic/target/debug/notes-service",
+                        service_exec.as_str(),
                         Vec::<(String, String)>::new(),
                         Some(<Self as cosmic::Application>::APP_ID),
                         false,
                     )
                     .await;
+                    //todo: consider waiting for a while to prevent spaming with calls to spawn_desktop_exec(), then repeat command again
+                    cosmic::Action::App(Message::SignalResult(command, false))
                 } else {
-                    tracing::info!("sent {command_str} successfully");
+                    cosmic::Action::App(Message::SignalResult(command, true))
                 }
-                cosmic::Action::App(Message::SignalSent(command))
             });
         }
         Task::none()

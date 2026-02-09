@@ -141,7 +141,6 @@ impl cosmic::Application for ServiceModel {
                 Err((errors, config)) => {
                     for why in errors {
                         tracing::error!("error loading app config: {why}");
-                        //tracing::error!(%why, "error loading app config");
                     }
                     config
                 }
@@ -149,7 +148,7 @@ impl cosmic::Application for ServiceModel {
             .unwrap_or_default();
 
         // Load notes from config if config/notes is not empty
-        let notes = Self::load_notes_or_default(&config);
+        let notes = Self::load_notes_or_default(&config.notes);
 
         // Construct the app model with the runtime's core.
         let mut app = ServiceModel {
@@ -244,10 +243,9 @@ impl cosmic::Application for ServiceModel {
             self.core()
                 .watch_config::<Config>(Self::APP_ID)
                 .map(|update| {
-                    // for why in update.errors {
-                    //     tracing::error!(?why, "app config error");
-                    // }
-
+                    for e in update.errors {
+                        tracing::error!("config error: {e}");
+                    }
                     Message::UpdateConfig(update.config)
                 }),
             // subscribe to some interested events from mouse and window:
@@ -508,7 +506,12 @@ impl cosmic::Application for ServiceModel {
 
 impl ServiceModel {
     fn on_signal(&mut self, command: &Command) -> Task<cosmic::Action<Message>> {
+        tracing::trace!("handling {command}");
         match command {
+            Command::Ping => {
+                // nothing to do
+            }
+
             Command::Quit => {
                 self.on_quit();
                 return iced::exit();
@@ -520,7 +523,7 @@ impl ServiceModel {
                     // todo: ask to overwrite unsaved notes
                     tracing::error!("drop unsaved changes while loading collection");
                 }
-                self.notes = Self::load_notes_or_default(&self.config);
+                self.notes = Self::load_notes_or_default(&self.config.notes);
             }
 
             Command::SaveNotes => {
@@ -624,11 +627,11 @@ impl ServiceModel {
             })
     }
 
-    fn load_notes_or_default(config: &Config) -> NotesCollection {
-        if config.notes.is_empty() {
+    fn load_notes_or_default(json: &str) -> NotesCollection {
+        if json.is_empty() {
             NotesCollection::default()
         } else {
-            NotesCollection::try_read(&config.notes)
+            NotesCollection::try_read(json)
                 .map_err(|e| {
                     tracing::error!(
                         "failed loading notes from {}/v{}/notes: {e}",

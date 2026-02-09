@@ -25,11 +25,13 @@ desktop-dst := base-dir / 'share' / 'applications' / desktop
 icons-dst := base-dir / 'share' / 'icons' / 'hicolor'
 icon-svg-dst := icons-dst / 'scalable' / 'apps'
 
-log-tracing := 'debug,wgpu=warn,iced_wgpu=warn,iced_graphics=warn,calloop=warn,cosmic_text=warn'
+applet := 'notes-applet'
+service := 'notes-service'
+log-tracing := 'warn,notes_basic=trace'
 
 # Default recipe
 default:
-    env RUST_BACKTRACE=full RUST_LOG={{log-tracing}} cargo run --bin notes-service
+    env RUST_BACKTRACE=full RUST_LOG={{log-tracing}} cargo run --bin {{applet}}
 
 # Runs `cargo clean`
 clean:
@@ -100,10 +102,10 @@ tag version:
 # my manual additions
 
 # Compiles with release profile
-rel *args: (build-release args)
+rel *args: (build-release '--bin' args)
 
 # Compiles with debug profile
-deb *args: (build-debug args)
+dbg *args: (build-debug '--bin' args)
 
 # Run the application for debugging purposes
 rund *args:

@@ -20,6 +20,7 @@ mod utils;
 /// Messages emitted by the application and its widgets.
 #[derive(Debug, Clone)]
 pub enum Command {
+    Ping,
     Quit,
     LoadNotes,
     SaveNotes,
@@ -39,6 +40,7 @@ pub enum NotesAppError {
     ParseError(String),
 }
 
+const PING: &str = "PING";
 const QUIT: &str = "QUIT";
 const LOAD: &str = "LOAD";
 const SAVE: &str = "SAVE";
@@ -56,6 +58,7 @@ impl std::fmt::Display for Command {
             f,
             "{}",
             match self {
+                Command::Ping => PING,
                 Command::Quit => QUIT,
                 Command::LoadNotes => LOAD,
                 Command::SaveNotes => SAVE,
@@ -75,19 +78,19 @@ impl FromStr for Command {
     type Err = NotesAppError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let tmp = match s {
-            QUIT => Self::Quit,
-            LOAD => Self::LoadNotes,
-            SAVE => Self::SaveNotes,
-            IMPORT => Self::ImportNotes,
-            EXPORT => Self::ExportNotes,
-            SHOW => Self::ShowAllNotes,
-            HIDE => Self::HideAllNotes,
-            LOCK => Self::LockAll,
-            RESTORE => Self::RestoreNotes,
-            SETTINGS => Self::OpenSettings,
-            _ => return Err(NotesAppError::ParseError(s.to_string())),
-        };
-        Ok(tmp)
+        match s {
+            PING => Ok(Self::Ping),
+            QUIT => Ok(Self::Quit),
+            LOAD => Ok(Self::LoadNotes),
+            SAVE => Ok(Self::SaveNotes),
+            IMPORT => Ok(Self::ImportNotes),
+            EXPORT => Ok(Self::ExportNotes),
+            SHOW => Ok(Self::ShowAllNotes),
+            HIDE => Ok(Self::HideAllNotes),
+            LOCK => Ok(Self::LockAll),
+            RESTORE => Ok(Self::RestoreNotes),
+            SETTINGS => Ok(Self::OpenSettings),
+            _ => Err(NotesAppError::ParseError(s.to_string())),
+        }
     }
 }
