@@ -53,7 +53,7 @@ impl cosmic::Application for AppletModel {
     type Message = Message;
 
     /// Unique identifier in RDNN (reverse domain name notation) format.
-    const APP_ID: &'static str = "dev.aae.notes";
+    const APP_ID: &'static str = super::APP_ID;
 
     fn core(&self) -> &cosmic::Core {
         &self.core
@@ -215,7 +215,7 @@ impl cosmic::Application for AppletModel {
                     tracing::warn!("failed sending {command}");
                 }
                 if let Command::Quit = command {
-                    tracing::info!("finish working itself");
+                    tracing::info!("finish working due to QUIT was sent to service");
                     return iced::exit();
                 }
             }
@@ -318,6 +318,7 @@ impl AppletModel {
                     .await
                 {
                     tracing::error!("failed sending {command_str}: {e}");
+                    //TODO: test error before spawning service; valid candidates are: InterfaceNotFound, Failure(e)
                     tracing::info!("trying to launch notes-service binary: {}", &service_exec);
                     desktop::spawn_desktop_exec(
                         service_exec.as_str(),

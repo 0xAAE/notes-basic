@@ -18,6 +18,8 @@ mod sticky_window;
 mod styles_view;
 mod utils;
 
+const APP_ID: &str = "com.github.aae.notes";
+
 /// Messages emitted by the application and its widgets.
 #[derive(Debug, Clone)]
 pub enum Command {
