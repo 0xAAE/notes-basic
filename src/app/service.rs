@@ -504,9 +504,10 @@ impl cosmic::Application for ServiceModel {
                 }
             }
 
-            Message::OpenUrl(url) => {
-                tracing::debug!("go to URL {url}");
-            }
+            Message::OpenUrl(url) => match open::that_detached(&url) {
+                Ok(()) => tracing::debug!("go to URL {url}"),
+                Err(err) => tracing::error!("failed to open {url:?}: {err}"),
+            },
         }
         Task::none()
     }
