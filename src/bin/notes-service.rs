@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MPL-2.0
 
-use notes_basic::{
+use sticky_notes::{
     app::{ServiceFlags, ServiceModel},
     i18n,
 };

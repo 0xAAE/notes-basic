@@ -1,7 +1,7 @@
 # Name of the application's binary.
-name := 'notes-basic'
+name := 'sticky-notes'
 # The unique ID of the application.
-appid := 'com.github.aae.notes'
+appid := 'com.github.aae.sticky_notes'
 
 # Path to root file system, which defaults to `/`.
 rootdir := ''
@@ -27,7 +27,7 @@ icon-svg-dst := icons-dst / 'scalable' / 'apps'
 
 applet := 'notes-applet'
 service := 'notes-service'
-log-tracing := 'warn,notes_basic=trace'
+log-tracing := 'warn,sticky_notes=trace'
 
 # Default recipe
 default:

@@ -1,17 +1,17 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <component type="desktop-application">
-  <id>com.github.0xaae.notes</id>
+  <id>com.github.0xaae.sticky_notes</id>
   <metadata_license>CC0-1.0</metadata_license>
   <project_license>MPL-2.0</project_license>
   <name>Sticky Notes</name>
   <summary>Implementation of sticky notes for Cosmmic desktop environment</summary>
   <icon type="remote" width="64" height="64" scale="1">
-    https://github.com/0xAAE/notes-basic/raw/main/resources/icons/hicolor/scalable/notes.svg
+    https://github.com/0xAAE/sticky-notes/raw/main/resources/icons/hicolor/scalable/notes.svg
   </icon>
-  <url type="vcs-browser">https://github.com/0xAAE/notes-basic</url>
-  <launchable type="desktop-id">com.github.aae.notes.desktop</launchable>
+  <url type="vcs-browser">https://github.com/0xAAE/sticky-notes</url>
+  <launchable type="desktop-id">com.github.aae.sticky_notes.desktop</launchable>
   <provides>
-    <id>com.github.aae.notes</id>
+    <id>com.github.aae.sticky_notes</id>
     <binaries>
       <binary>notes-applet</binary>
     </binaries>

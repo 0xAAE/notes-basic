@@ -1,6 +1,6 @@
-# Notes Basic
+# Sticky Notes
 
-Basic implementation of [indicator-sticky-notes](https://github.com/umangv/indicator-stickynotes) with [pop-os/libcosmic](https://github.com/pop-os/libcosmic/tree/master) targeting the [Cosmic DE](https://github.com/pop-os/cosmic-epoch)
+This project is a remake of [indicator-sticky-notes](https://github.com/umangv/indicator-stickynotes) using [pop-os/libcosmic](https://github.com/pop-os/libcosmic/tree/master) and targeting the [Cosmic DE](https://github.com/pop-os/cosmic-epoch)
 
 Other details to be provided when version 0.1.0 has come
 
@@ -27,7 +27,7 @@ If packaging for a Linux distribution, vendor dependencies locally with the `ven
 ```sh
 just vendor
 just build-vendored
-just rootdir=debian/notes-basic prefix=/usr install
+just rootdir=debian/sticky-notes prefix=/usr install
 ```
 
 It is recommended to build a source tarball with the vendored dependencies, which can typically be done by running `just vendor` on the host system before it enters the build environment.

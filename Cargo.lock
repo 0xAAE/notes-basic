@@ -3337,31 +3337,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "notes-basic"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "chrono",
- "dirs-next",
- "futures-util",
- "i18n-embed",
- "i18n-embed-fl",
- "libcosmic",
- "open",
- "palette",
- "rust-embed",
- "serde",
- "serde-json-fmt",
- "serde_json",
- "thiserror 2.0.18",
- "tokio",
- "tracing",
- "tracing-subscriber",
- "uuid",
- "zbus 5.13.2",
-]
-
-[[package]]
 name = "notify"
 version = "8.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5053,6 +5028,31 @@ name = "static_assertions"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
+
+[[package]]
+name = "sticky-notes"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "dirs-next",
+ "futures-util",
+ "i18n-embed",
+ "i18n-embed-fl",
+ "libcosmic",
+ "open",
+ "palette",
+ "rust-embed",
+ "serde",
+ "serde-json-fmt",
+ "serde_json",
+ "thiserror 2.0.18",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+ "uuid",
+ "zbus 5.13.2",
+]
 
 [[package]]
 name = "strict-num"

@@ -18,7 +18,7 @@ mod sticky_window;
 mod styles_view;
 mod utils;
 
-const APP_ID: &str = "com.github.aae.notes";
+const APP_ID: &str = "com.github.aae.sticky_notes";
 
 /// Messages emitted by the application and its widgets.
 #[derive(Debug, Clone)]

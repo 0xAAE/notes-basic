@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MPL-2.0
 
-use notes_basic::{app::AppletModel, i18n};
+use sticky_notes::{app::AppletModel, i18n};
 
 fn main() -> cosmic::iced::Result {
     tracing_subscriber::fmt::init();
