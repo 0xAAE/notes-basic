@@ -139,7 +139,8 @@ fn import_end_export() {
     const INPUT_FILE: &str = "test_data/indicator-stickynotes";
 
     // read source file into buffer
-    let buf = std::fs::read(INPUT_FILE).expect(format!("reading input file {INPUT_FILE}").as_str());
+    let buf =
+        std::fs::read(INPUT_FILE).unwrap_or_else(|_| panic!("reading input file {INPUT_FILE}"));
     assert!(!buf.is_empty());
 
     // parse buffer content, then test expected values
