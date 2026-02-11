@@ -1,46 +1,109 @@
 # Sticky Notes
 
-This project is a remake of [indicator-sticky-notes](https://github.com/umangv/indicator-stickynotes) using [pop-os/libcosmic](https://github.com/pop-os/libcosmic/tree/master) and targeting the [Cosmic DE](https://github.com/pop-os/cosmic-epoch)
+This project is a remake of [indicator-stickynotes](https://github.com/umangv/indicator-stickynotes) using [pop-os/libcosmic](https://github.com/pop-os/libcosmic/tree/master) and targeting the [Cosmic DE](https://github.com/pop-os/cosmic-epoch)
 
-Other details to be provided when version 0.1.0 has come
+There are two components in sticky-notes
+* `notes-service` is a core application to deal with notes and settings
+* `notes-applet` is an applet in Cosmic Panel providing main menu for `notes-service`
 
-## Installation
+Other details is to be provided when version 0.1.0 has come
+
+## Configuration
+
+The path to configuration is `~/.config/cosmic/com.github.aae/sticky_notes/v1`.
+
+Each value is stored in a separate file having following names.
+
+### `service_bin` (highly desired)
+
+To provide a full pathname to `notes-service` binary file. It is used by the `notes-applet` to automatically launch the `notes-service` if it is not detected after start.
+
+Value type: `string` (i.e. surrounded with double quotes)
+
+Example: `"/home/user/.bin/notes-service"`
+
+Default value: `"/usr/local/bin/notes-service"`
+
+### `import_file` (optional)
+
+To provide a pathname to `indicator-stickynotes` database file relative to user's home directory. It is used for importing notes when
+  * no database detected on startup
+  * command `Import` selected in `notes-applet` menu
+
+Value type: `string` (i.e. surrounded with double quotes)
+
+Example: `".config/indicator-stickynotes"`
+
+Default value: `".config/indicator-stickynotes"`
+
+### `restore_notes_width` and `restore_notes_height` (optional)
+
+Overrides the width and height of the window to restore notes.
+
+Value type: `integer`
+
+Example: `1024`
+
+Default values: `restore_notes_width` is `480` and `restore_notes_height` is `400`
+
+### `edit_style_width` and `edit_style_height` (optional)
+
+Overrides the width and height of the window to edit selected note style.
+
+Value type: `integer`
+
+Example: `1024`
+
+Default values: `edit_style_width` is `480` and `edit_style_height` is `800`
+
+### `about_width` and `about_height` (optional)
+
+Overrides the width and height of the window to display application info.
+
+Value type: `integer`
+
+Example: `1024`
+
+Default values: `about_width` is `480` and `about_height` is `840`
+
+### `toolbar_icon_size` (optional)
+
+Overrides the size of icons in the sticky window toolbar.
+
+Value type: integer
+
+Example: `32`
+
+Default value: `16`
+
+### `notes` (auto generated)
+
+Contains sticky-notes database.
+Value type: `JSON string` (i.e. in double quotes).
+
+:exclamation: Edit carefully otherwise it won't be read properly. It is highly recommended to edit notes in sticky windows and settings
+
+
+## Build, install and run (current version only)
+
+There are two components must start
+
+* notes-service
+* notes-applet
+
+:point_up: The `notes-applet` automatically launches `notes-service` if it is not detected and if `service_bin` is set in config. User might setup `service_bin` once and require to launch only `notes-applet` then.
 
 A [justfile](./justfile) is included by default for the [casey/just][just] command runner.
 
-- `just` builds the application with the default `just build-release` recipe
-- `just run` builds and runs the application
+- `just` does the same as `just rund-applet`
+- `just rund-service` builds and runs the `notes-service` with debug profile
+- `just rund-applet` builds and runs the `notes-applet` with debug profile
+- `just run-service` builds and runs the `notes-service` with release profile
+- `just run-applet` builds and runs the `notes-applet` with release profile
 - `just install` installs the project into the system
 - `just vendor` creates a vendored tarball
 - `just build-vendored` compiles with vendored dependencies from that tarball
 - `just check` runs clippy on the project to check for linter warnings
 - `just check-json` can be used by IDEs that support LSP
 
-## Translators
-
-[Fluent][fluent] is used for localization of the software. Fluent's translation files are found in the [i18n directory](./i18n). New translations may copy the [English (en) localization](./i18n/en) of the project, rename `en` to the desired [ISO 639-1 language code][iso-codes], and then translations can be provided for each [message identifier][fluent-guide]. If no translation is necessary, the message may be omitted.
-
-## Packaging
-
-If packaging for a Linux distribution, vendor dependencies locally with the `vendor` rule, and build with the vendored sources using the `build-vendored` rule. When installing files, use the `rootdir` and `prefix` variables to change installation paths.
-
-```sh
-just vendor
-just build-vendored
-just rootdir=debian/sticky-notes prefix=/usr install
-```
-
-It is recommended to build a source tarball with the vendored dependencies, which can typically be done by running `just vendor` on the host system before it enters the build environment.
-
-## Developers
-
-Developers should install [rustup][rustup] and configure their editor to use [rust-analyzer][rust-analyzer]. To improve compilation times, disable LTO in the release profile, install the [mold][mold] linker, and configure [sccache][sccache] for use with Rust. The [mold][mold] linker will only improve link times if LTO is disabled.
-
-[fluent]: https://projectfluent.org/
-[fluent-guide]: https://projectfluent.org/fluent/guide/hello.html
-[iso-codes]: https://en.wikipedia.org/wiki/List_of_ISO_639-1_codes
 [just]: https://github.com/casey/just
-[rustup]: https://rustup.rs/
-[rust-analyzer]: https://rust-analyzer.github.io/
-[mold]: https://github.com/rui314/mold
-[sccache]: https://github.com/mozilla/sccache

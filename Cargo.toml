@@ -3,7 +3,7 @@ name = "sticky-notes"
 version = "0.1.0"
 edition = "2024"
 license = "MPL-2.0"
-description = "Implementation of sticky notes for Cosmmic desktop environment"
+description = "Implementation of sticky notes for Cosmic desktop environment"
 repository = "https://github.com/0xAAE/sticky-notes"
 default-run = "notes-service"
 
