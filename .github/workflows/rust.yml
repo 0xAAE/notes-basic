@@ -16,6 +16,10 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+    - name: Install required libs
+      run: |
+        sudo apt-get update # Always run update first
+        sudo apt-get install -y libxkbcommon-dev
     - name: Build
       run: cargo build --verbose
     - name: Check
