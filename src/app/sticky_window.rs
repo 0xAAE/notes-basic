@@ -82,6 +82,7 @@ impl StickyWindow {
         self.style_names = None;
     }
 
+    #[allow(clippy::too_many_lines)]
     pub fn build_view<'a>(
         &'a self,
         window_id: Id,
