@@ -1,4 +1,7 @@
-use super::{service::Message, utils::with_background};
+use super::{
+    service::Message,
+    utils::{cosmic_font, with_background},
+};
 use crate::{
     fl,
     icons::IconSet,
@@ -6,7 +9,6 @@ use crate::{
 };
 use cosmic::prelude::*;
 use cosmic::{
-    font::{self, Font},
     iced::{Color, Length, window::Id},
     widget::{self, text_editor::Action},
 };
@@ -191,7 +193,7 @@ impl StickyWindow {
                 .height(Length::Fill)
                 .push(
                     widget::text(note.get_content())
-                        .font(Self::get_font(style))
+                        .font(cosmic_font(style.get_font().style))
                         .size(style.get_font().size),
                 );
 
@@ -205,16 +207,6 @@ impl StickyWindow {
         } else {
             // build problem view
             widget::text("problem-text").into()
-        }
-    }
-
-    fn get_font(style: &NoteStyle) -> Font {
-        match style.get_font().style {
-            crate::notes::FontStyle::Default => font::default(),
-            crate::notes::FontStyle::Light => font::light(),
-            crate::notes::FontStyle::Semibold => font::semibold(),
-            crate::notes::FontStyle::Bold => font::bold(),
-            crate::notes::FontStyle::Monospace => font::mono(),
         }
     }
 }

@@ -3,7 +3,7 @@ use cosmic::{cosmic_theme::palette::Srgb, iced::Color};
 use serde::{Deserialize, Deserializer, Serializer, ser::SerializeTuple};
 
 /// The style defines how to adjust font to display a text
-#[derive(serde::Deserialize, serde::Serialize, Clone, Debug, Default, PartialEq)]
+#[derive(serde::Deserialize, serde::Serialize, Clone, Copy, Debug, Default, PartialEq)]
 pub enum FontStyle {
     #[default]
     Default,
@@ -16,11 +16,11 @@ pub enum FontStyle {
 impl std::fmt::Display for FontStyle {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            FontStyle::Bold => write!(f, "Bold"),
             FontStyle::Default => write!(f, "Default"),
             FontStyle::Light => write!(f, "Light"),
-            FontStyle::Monospace => write!(f, "Monospace"),
             FontStyle::Semibold => write!(f, "Semibold"),
+            FontStyle::Bold => write!(f, "Bold"),
+            FontStyle::Monospace => write!(f, "Monospace"),
         }
     }
 }

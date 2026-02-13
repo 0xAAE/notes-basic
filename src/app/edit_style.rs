@@ -1,10 +1,13 @@
 use super::{service::Message, utils::with_background};
-use crate::fl;
-use crate::notes::{Font, NoteStyle};
-use cosmic::iced::Length;
+use crate::{
+    fl,
+    notes::{Font, FontStyle, NoteStyle},
+};
 use cosmic::prelude::*;
-use cosmic::widget::color_picker::ColorPickerUpdate;
-use cosmic::{iced::Color, widget};
+use cosmic::{
+    iced::{Alignment, Color, Length},
+    widget::{self, color_picker::ColorPickerUpdate},
+};
 use palette::FromColor;
 use uuid::Uuid;
 
@@ -14,6 +17,7 @@ pub struct EditStyleDialog {
     font: Font,
     bgcolor: Color,
     color_picker_model: widget::ColorPickerModel,
+    avail_fonts: Vec<String>,
 }
 
 impl EditStyleDialog {
@@ -29,11 +33,16 @@ impl EditStyleDialog {
                 Some(style.get_background_color()),
                 Some(style.get_background_color()),
             ),
+            avail_fonts: get_avail_fonts().iter().map(ToString::to_string).collect(),
         }
     }
 
     pub fn update_name(&mut self, name: String) {
         self.name = name;
+    }
+
+    pub fn update_font_style(&mut self, font_style: FontStyle) {
+        self.font.style = font_style;
     }
 
     pub fn get_id(&self) -> Uuid {
@@ -99,6 +108,7 @@ impl EditStyleDialog {
 
     fn build_edit_style_control(&self) -> Element<'_, Message> {
         widget::column::with_capacity(3)
+            .spacing(cosmic::theme::spacing().space_m)
             .push(
                 widget::row::with_capacity(1).push(
                     widget::text_input("", &self.name)
@@ -106,12 +116,28 @@ impl EditStyleDialog {
                         .on_input(Message::InputStyleName),
                 ),
             )
-            .push(widget::row::with_capacity(1).push(
-                widget::text_input("", self.font.style.to_string()).label(fl!("edit-style-font")),
-            ))
             .push(
                 widget::row::with_capacity(2)
-                    .push(widget::text(fl!("edit-style-bg")))
+                    .spacing(cosmic::theme::spacing().space_m)
+                    .align_y(Alignment::Center)
+                    .push(widget::text(fl!("edit-style-font")))
+                    .push(widget::dropdown(
+                        &self.avail_fonts,
+                        self.try_get_current_font_index(),
+                        move |selected_index| {
+                            Message::FontStyleUpdate(
+                                get_avail_fonts()
+                                    .get(selected_index)
+                                    .copied()
+                                    .unwrap_or_default(),
+                            )
+                        },
+                    )),
+            )
+            .push(
+                widget::column::with_capacity(2)
+                    .spacing(cosmic::theme::spacing().space_m)
+                    .push(widget::text(fl!("edit-style-bg")).align_y(Alignment::Center))
                     .push(self.build_color_picker())
                     .height(Length::Fill),
             )
@@ -131,4 +157,21 @@ impl EditStyleDialog {
             )
             .into()
     }
+
+    fn try_get_current_font_index(&self) -> Option<usize> {
+        get_avail_fonts()
+            .iter()
+            .enumerate()
+            .find_map(|(index, style)| (*style == self.font.style).then_some(index))
+    }
+}
+
+const fn get_avail_fonts() -> &'static [FontStyle] {
+    &[
+        FontStyle::Default,
+        FontStyle::Light,
+        FontStyle::Semibold,
+        FontStyle::Bold,
+        FontStyle::Monospace,
+    ]
 }

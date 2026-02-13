@@ -12,7 +12,7 @@ use crate::{
     },
     config::Config,
     fl, icons,
-    notes::{Font, NoteData, NotesCollection},
+    notes::{Font, FontStyle, NoteData, NotesCollection},
 };
 use cosmic::prelude::*;
 use cosmic::{
@@ -79,13 +79,14 @@ pub enum Message {
     NoteDelete(Id),               // delete note
     NoteRestore(Uuid),            // restore note
     // Styles view buttons
-    StyleNew,               // add new style
-    StyleEdit(Uuid),        // edit style by style_id
-    StyleDelete(Uuid),      // delete style by style_id
-    EditStyleUpdate,        // Ok was pressed in edit style dialog
-    EditStyleCancel,        // Cancel was pressed in edit style dialog
-    InputStyleName(String), // update currently edited style name
-    ColorUpdate(widget::color_picker::ColorPickerUpdate),
+    StyleNew,                                             // add new style
+    StyleEdit(Uuid),                                      // edit style by style_id
+    StyleDelete(Uuid),                                    // delete style by style_id
+    EditStyleUpdate,                                      // Ok was pressed in edit style dialog
+    EditStyleCancel,                                      // Cancel was pressed in edit style dialog
+    InputStyleName(String),                               // update currently edited style name
+    ColorUpdate(widget::color_picker::ColorPickerUpdate), // update currently edited style color
+    FontStyleUpdate(FontStyle),                           // update currently edited style font
     // Open URL
     OpenUrl(String),
 }
@@ -495,6 +496,12 @@ impl cosmic::Application for ServiceModel {
             Message::ColorUpdate(event) => {
                 if let Some((_window_id, dialog)) = &mut self.edit_style {
                     return dialog.on_color_picker_update(event);
+                }
+            }
+
+            Message::FontStyleUpdate(font_style) => {
+                if let Some((_window_id, dialog)) = &mut self.edit_style {
+                    dialog.update_font_style(font_style);
                 }
             }
 
