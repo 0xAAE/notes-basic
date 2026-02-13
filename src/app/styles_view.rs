@@ -49,7 +49,7 @@ fn build_style_list_item<'a>(
             widget::text(format!(
                 "{}, preferred font {}",
                 style.get_name(),
-                style.get_font_name()
+                style.get_font().style
             ))
             .width(Length::Fill),
         )

@@ -1,8 +1,13 @@
-use super::service::Message;
-use crate::{fl, icons::IconSet, notes::NotesCollection};
+use super::{service::Message, utils::with_background};
+use crate::{
+    fl,
+    icons::IconSet,
+    notes::{NoteStyle, NotesCollection},
+};
 use cosmic::prelude::*;
 use cosmic::{
-    iced::{Length, window::Id},
+    font::{self, Font},
+    iced::{Color, Length, window::Id},
     widget::{self, text_editor::Action},
 };
 use thiserror::Error;
@@ -82,6 +87,10 @@ impl StickyWindow {
         icons: &IconSet,
     ) -> Element<'a, Message> {
         if let Some(edit_context) = &self.edit_context {
+            let bgcolor = notes
+                .try_get_note_style(self.get_note_id())
+                .map_or(Color::WHITE, NoteStyle::get_background_color);
+
             let note_toolbar = widget::row::with_capacity(1).push(
                 icons
                     .checked()
@@ -99,11 +108,16 @@ impl StickyWindow {
             .width(Length::Fill)
             .height(Length::Fill);
 
-            widget::column::with_capacity(2)
-                .push(note_toolbar)
-                .push(note_content)
-                .into()
-        } else if let Ok(note) = notes.try_get_note(&self.note_id) {
+            with_background(
+                widget::column::with_capacity(2)
+                    .push(note_toolbar)
+                    .push(note_content)
+                    .into(),
+                bgcolor,
+            )
+        } else if let Ok(note) = notes.try_get_note(&self.note_id)
+            && let Ok(style) = notes.try_get_style(&note.style())
+        {
             let is_locked = note.is_locked();
 
             let mut note_toolbar = widget::row::with_capacity(7)
@@ -137,7 +151,7 @@ impl StickyWindow {
                                 .try_get_note_style_index(self.note_id)
                                 .map_err(|e| tracing::error!("failed to get style index: {e}"))
                                 .ok(),
-                            move |index| Message::NoteSyleSelected(window_id, index),
+                            move |index| Message::NoteStyleSelected(window_id, index),
                         )
                         .placeholder(fl!("select-default-style")),
                     );
@@ -175,15 +189,32 @@ impl StickyWindow {
             let note_content = widget::column::with_capacity(2)
                 .width(Length::Fill)
                 .height(Length::Fill)
-                .push(widget::text(note.get_content()));
+                .push(
+                    widget::text(note.get_content())
+                        .font(Self::get_font(style))
+                        .size(style.get_font().size),
+                );
 
-            widget::column::with_capacity(2)
-                .push(note_toolbar)
-                .push(note_content)
-                .into()
+            with_background(
+                widget::column::with_capacity(2)
+                    .push(note_toolbar)
+                    .push(note_content)
+                    .into(),
+                style.get_background_color(),
+            )
         } else {
             // build problem view
             widget::text("problem-text").into()
+        }
+    }
+
+    fn get_font(style: &NoteStyle) -> Font {
+        match style.get_font().style {
+            crate::notes::FontStyle::Default => font::default(),
+            crate::notes::FontStyle::Light => font::light(),
+            crate::notes::FontStyle::Semibold => font::semibold(),
+            crate::notes::FontStyle::Bold => font::bold(),
+            crate::notes::FontStyle::Monospace => font::mono(),
         }
     }
 }

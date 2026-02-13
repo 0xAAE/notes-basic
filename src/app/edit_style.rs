@@ -1,6 +1,6 @@
 use super::{service::Message, utils::with_background};
 use crate::fl;
-use crate::notes::NoteStyle;
+use crate::notes::{Font, NoteStyle};
 use cosmic::iced::Length;
 use cosmic::prelude::*;
 use cosmic::widget::color_picker::ColorPickerUpdate;
@@ -11,7 +11,7 @@ use uuid::Uuid;
 pub struct EditStyleDialog {
     style_id: Uuid,
     name: String,
-    font_name: String,
+    font: Font,
     bgcolor: Color,
     color_picker_model: widget::ColorPickerModel,
 }
@@ -21,7 +21,7 @@ impl EditStyleDialog {
         Self {
             style_id,
             name: style.get_name().to_string(),
-            font_name: style.get_font_name().to_string(),
+            font: style.get_font().clone(),
             bgcolor: style.get_background_color(),
             color_picker_model: widget::ColorPickerModel::new(
                 fl!("edit-style-hex"),
@@ -44,8 +44,8 @@ impl EditStyleDialog {
         &self.name
     }
 
-    pub fn get_font_name(&self) -> &str {
-        &self.font_name
+    pub fn get_font(&self) -> Font {
+        self.font.clone()
     }
 
     pub fn get_background_color(&self) -> Color {
@@ -63,7 +63,7 @@ impl EditStyleDialog {
             }
             ColorPickerUpdate::Reset | ColorPickerUpdate::Input(_) => {
                 // cannot restore color until reset has completed in color_picker_model.update(),
-                // so attach subsequent event AplliedColor message to get another one call
+                // so attach subsequent event AppliedColor message to get another one call
                 return self.color_picker_model.update(event).chain(
                     cosmic::Task::done(Message::ColorUpdate(ColorPickerUpdate::AppliedColor))
                         .map(cosmic::Action::from),
@@ -106,10 +106,9 @@ impl EditStyleDialog {
                         .on_input(Message::InputStyleName),
                 ),
             )
-            .push(
-                widget::row::with_capacity(1)
-                    .push(widget::text_input("", &self.font_name).label(fl!("edit-style-font"))),
-            )
+            .push(widget::row::with_capacity(1).push(
+                widget::text_input("", self.font.style.to_string()).label(fl!("edit-style-font")),
+            ))
             .push(
                 widget::row::with_capacity(2)
                     .push(widget::text(fl!("edit-style-bg")))
