@@ -651,7 +651,7 @@ impl ServiceModel {
             if let Err(e) = self.save_notes() {
                 tracing::error!("failed saving notes on exit: {e}");
             } else {
-                tracing::info!("notes collection was changed, save");
+                tracing::info!("notes collection was saved");
             }
         } else {
             tracing::info!("notes collection is unchanged, skip saving");

@@ -120,6 +120,7 @@ impl NoteStyle {
 
     pub fn set_name(&mut self, name: &str) {
         if self.name != name {
+            tracing::debug!("(*) unsaved style: renamed {} into {name}", self.name);
             self.name = name.to_string();
             self.is_dirty = true;
         }
@@ -127,6 +128,7 @@ impl NoteStyle {
 
     pub fn set_font(&mut self, font: Font) {
         if self.font != font {
+            tracing::debug!("(*) unsaved style: font changed");
             self.font = font;
             self.is_dirty = true;
         }
@@ -134,6 +136,7 @@ impl NoteStyle {
 
     pub fn set_background_color(&mut self, color: Color) {
         if self.bgcolor != color {
+            tracing::debug!("(*) unsaved style: color changed");
             self.bgcolor = color;
             self.is_dirty = true;
         }
