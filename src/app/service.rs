@@ -611,7 +611,7 @@ impl ServiceModel {
             }
 
             Command::OpenSettings => {
-                return Self::spawn_settings_window();
+                return self.spawn_settings_window();
             }
 
             Command::OpenAbout => {
@@ -994,29 +994,53 @@ impl ServiceModel {
             size: self.config.restore_notes_size(),
             ..Default::default()
         });
-        spawn_window.map(|id| cosmic::Action::App(Message::RestoreWindowCreated(id)))
+        let task = spawn_window.map(|id| cosmic::Action::App(Message::RestoreWindowCreated(id)));
+        if let Some(existing_window_id) = self.restore_window_id {
+            tracing::debug!("force closing existing 'restore' window");
+            window::close(existing_window_id).chain(task)
+        } else {
+            task
+        }
     }
 
-    fn spawn_settings_window() -> Task<cosmic::Action<Message>> {
+    fn spawn_settings_window(&mut self) -> Task<cosmic::Action<Message>> {
         let (_id, spawn_window) = window::open(window::Settings::default());
-        spawn_window.map(|id| cosmic::Action::App(Message::SettingsWindowCreated(id)))
+        let task = spawn_window.map(|id| cosmic::Action::App(Message::SettingsWindowCreated(id)));
+        if let Some(existing_window_id) = std::mem::take(&mut self.settings_window_id) {
+            tracing::debug!("force closing existing 'settings' window");
+            window::close(existing_window_id).chain(task)
+        } else {
+            task
+        }
     }
 
-    fn spawn_about_window(&self) -> Task<cosmic::Action<Message>> {
+    fn spawn_about_window(&mut self) -> Task<cosmic::Action<Message>> {
         let (_id, spawn_window) = window::open(window::Settings {
             size: self.config.about_size(),
             ..Default::default()
         });
-        spawn_window.map(|id| cosmic::Action::App(Message::AboutWindowCreated(id)))
+        let task = spawn_window.map(|id| cosmic::Action::App(Message::AboutWindowCreated(id)));
+        if let Some((existing_window_id, _about_window)) = std::mem::take(&mut self.about_window) {
+            tracing::debug!("force closing existing 'about' window");
+            window::close(existing_window_id).chain(task)
+        } else {
+            task
+        }
     }
 
-    fn spawn_edit_style_window(&self, style_id: Uuid) -> Task<cosmic::Action<Message>> {
+    fn spawn_edit_style_window(&mut self, style_id: Uuid) -> Task<cosmic::Action<Message>> {
         let (_id, spawn_window) = window::open(window::Settings {
             size: self.config.edit_style_size(),
             ..Default::default()
         });
-        spawn_window
-            .map(move |id| cosmic::Action::App(Message::EditStyleWindowCreated(id, style_id)))
+        let task = spawn_window
+            .map(move |id| cosmic::Action::App(Message::EditStyleWindowCreated(id, style_id)));
+        if let Some((existing_window_id, _edit_style)) = std::mem::take(&mut self.edit_style) {
+            tracing::debug!("force closing existing 'edit style' window");
+            window::close(existing_window_id).chain(task)
+        } else {
+            task
+        }
     }
 
     fn close_sticky_windows(&mut self) -> Vec<Task<cosmic::Action<Message>>> {
@@ -1029,13 +1053,16 @@ impl ServiceModel {
 
     fn close_all_windows(&mut self) -> Task<cosmic::Action<Message>> {
         let mut commands = self.close_sticky_windows();
-        if let Some(restore_id) = self.restore_window_id {
+        if let Some(restore_id) = self.restore_window_id.take() {
             commands.push(window::close(restore_id));
         }
-        if let Some(settings_id) = self.settings_window_id {
+        if let Some(settings_id) = self.settings_window_id.take() {
             commands.push(window::close(settings_id));
         }
-        if let Some((edit_style_id, _)) = self.edit_style {
+        if let Some((about_id, _)) = self.about_window.take() {
+            commands.push(window::close(about_id));
+        }
+        if let Some((edit_style_id, _)) = self.edit_style.take() {
             commands.push(window::close(edit_style_id));
         }
         cosmic::task::batch(commands)
