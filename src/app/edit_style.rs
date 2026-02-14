@@ -1,4 +1,7 @@
-use super::{service::Message, utils::with_background};
+use super::{
+    service::Message,
+    utils::{cosmic_font, with_background},
+};
 use crate::{
     fl,
     notes::{Font, FontStyle, NoteStyle},
@@ -11,6 +14,9 @@ use cosmic::{
 use palette::FromColor;
 use uuid::Uuid;
 
+const MIN_FONT_SIZE: u16 = 6;
+const MAX_FONT_SIZE: u16 = 72;
+
 pub struct EditStyleDialog {
     style_id: Uuid,
     name: String,
@@ -18,14 +24,17 @@ pub struct EditStyleDialog {
     bgcolor: Color,
     color_picker_model: widget::ColorPickerModel,
     avail_fonts: Vec<String>,
+    font_size_text: String,
 }
 
 impl EditStyleDialog {
     pub fn new(style_id: Uuid, style: &NoteStyle) -> Self {
+        let font = style.get_font().clone();
+        let font_size_text = font.size.to_string();
         Self {
             style_id,
             name: style.get_name().to_string(),
-            font: style.get_font().clone(),
+            font,
             bgcolor: style.get_background_color(),
             color_picker_model: widget::ColorPickerModel::new(
                 fl!("edit-style-hex"),
@@ -34,6 +43,7 @@ impl EditStyleDialog {
                 Some(style.get_background_color()),
             ),
             avail_fonts: get_avail_fonts().iter().map(ToString::to_string).collect(),
+            font_size_text,
         }
     }
 
@@ -43,6 +53,11 @@ impl EditStyleDialog {
 
     pub fn update_font_style(&mut self, font_style: FontStyle) {
         self.font.style = font_style;
+    }
+
+    pub fn update_font_size(&mut self, font_size: u16) {
+        self.font.size = font_size;
+        self.font_size_text = font_size.to_string();
     }
 
     pub fn get_id(&self) -> Uuid {
@@ -107,7 +122,7 @@ impl EditStyleDialog {
     }
 
     fn build_edit_style_control(&self) -> Element<'_, Message> {
-        widget::column::with_capacity(3)
+        widget::column::with_capacity(4)
             .spacing(cosmic::theme::spacing().space_m)
             .push(
                 widget::row::with_capacity(1).push(
@@ -117,7 +132,7 @@ impl EditStyleDialog {
                 ),
             )
             .push(
-                widget::row::with_capacity(2)
+                widget::row::with_capacity(4)
                     .spacing(cosmic::theme::spacing().space_m)
                     .align_y(Alignment::Center)
                     .push(widget::text(fl!("edit-style-font")))
@@ -132,7 +147,23 @@ impl EditStyleDialog {
                                     .unwrap_or_default(),
                             )
                         },
+                    ))
+                    .push(widget::text(fl!("edit-style-font-size")))
+                    .push(widget::spin_button::vertical(
+                        &self.font_size_text,
+                        //todo: how to conditionally compile depending on #[cfg(feature = "libcosmic/a11y")]
+                        &self.font_size_text, // is required if 'a11y' feature is on
+                        self.font.size,
+                        1,
+                        MIN_FONT_SIZE,
+                        MAX_FONT_SIZE,
+                        Message::FontSizeUpdate,
                     )),
+            )
+            .push(
+                widget::text(fl!("edit-style-font-sample"))
+                    .font(cosmic_font(self.font.style))
+                    .size(self.font.size),
             )
             .push(
                 widget::column::with_capacity(2)

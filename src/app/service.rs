@@ -87,6 +87,7 @@ pub enum Message {
     InputStyleName(String),                               // update currently edited style name
     ColorUpdate(widget::color_picker::ColorPickerUpdate), // update currently edited style color
     FontStyleUpdate(FontStyle),                           // update currently edited style font
+    FontSizeUpdate(u16),                                  // update currently edited style font size
     // Open URL
     OpenUrl(String),
 }
@@ -505,6 +506,12 @@ impl cosmic::Application for ServiceModel {
                 }
             }
 
+            Message::FontSizeUpdate(font_size) => {
+                if let Some((_window_id, dialog)) = &mut self.edit_style {
+                    dialog.update_font_size(font_size);
+                }
+            }
+
             Message::OpenUrl(url) => match open::that_detached(&url) {
                 Ok(()) => tracing::debug!("go to URL {url}"),
                 Err(err) => tracing::error!("failed to open {url:?}: {err}"),
@@ -652,7 +659,7 @@ impl ServiceModel {
         // warn if deleted notes were dropped
         let count_deleted = self.notes.iter_deleted_notes().count();
         if count_deleted > 0 {
-            //TODO: what about saving deleted notes too? Maybe with their TTLs
+            //todo: what about saving deleted notes too? Maybe with their TTLs
             tracing::warn!("completely drop some deleted notes on exit: {count_deleted}");
         }
     }
