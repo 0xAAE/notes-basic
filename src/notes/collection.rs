@@ -200,6 +200,7 @@ impl NotesCollection {
         self.notes.values_mut().for_each(NoteData::commit);
         self.styles.values_mut().for_each(NoteStyle::commit);
         self.is_dirty = false;
+        tracing::debug!("saved collection: no changes for now");
     }
 
     // operations with notes
@@ -253,6 +254,10 @@ impl NotesCollection {
 
     pub fn delete_note(&mut self, note_id: Uuid) {
         if let Some((id, note)) = self.notes.remove_entry(&note_id) {
+            tracing::debug!(
+                "(*) unsaved collection: deleted note {note_id} ({})",
+                note.get_title()
+            );
             self.is_dirty = true;
             self.deleted_notes.insert(id, note);
         }
@@ -263,6 +268,10 @@ impl NotesCollection {
         note_id: Uuid,
     ) -> Result<&NoteData, NotesCollectionError> {
         if let Some((id, note)) = self.deleted_notes.remove_entry(&note_id) {
+            tracing::debug!(
+                "(*) unsaved collection: restored note {note_id} ({})",
+                note.get_title()
+            );
             self.is_dirty = true;
             self.notes.insert(id, note);
             self.notes
@@ -316,6 +325,11 @@ impl NotesCollection {
             .nth(style_index)
             .map(|id| {
                 if self.default_style != *id {
+                    tracing::debug!(
+                        "(*) unsaved collection: replaced default style {} with {}",
+                        self.default_style,
+                        *id
+                    );
                     self.default_style = *id;
                     self.is_dirty = true;
                 }
@@ -364,10 +378,15 @@ impl NotesCollection {
         if self.styles.len() < 2 {
             Err(NotesCollectionError::DeleteLastStyle)
         } else if self.styles.remove(&style_id).is_some() {
+            tracing::debug!("(*) unsaved collection: deleted style {style_id}");
             self.is_dirty = true;
             // if default style is being deleted select another one as default
             if style_id == self.default_style {
                 self.default_style = self.styles.keys().next().copied().unwrap_or_default();
+                tracing::debug!(
+                    "replaced default style {style_id} with {}",
+                    self.default_style
+                );
             }
             // replace all existing notes style if it is being deleted
             let default_style = self.default_style;

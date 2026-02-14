@@ -77,6 +77,7 @@ impl NoteData {
     }
 
     pub fn set_content(&mut self, content: String) {
+        tracing::debug!("(*) unsaved note: content changed");
         self.content = content;
         self.modified = Utc::now();
         self.is_dirty = true;
@@ -114,6 +115,10 @@ impl NoteData {
 
     pub fn set_position(&mut self, left: usize, top: usize) {
         if self.position != (left, top) {
+            if ! self.is_dirty {
+                // report only once
+                tracing::debug!("(*) unsaved note: position changed");
+            }
             self.position = (left, top);
             self.is_dirty = true;
         }
@@ -121,6 +126,10 @@ impl NoteData {
 
     pub fn set_size(&mut self, width: usize, height: usize) {
         if self.size != (width, height) {
+            if ! self.is_dirty {
+                // report only once
+                tracing::debug!("(*) unsaved note: size changed");
+            }
             self.size = (width, height);
             self.is_dirty = true;
         }
@@ -133,6 +142,10 @@ impl NoteData {
 
     pub fn set_locking(&mut self, on: bool) {
         if self.is_locked != on {
+            if ! self.is_dirty {
+                // report only once
+                tracing::debug!("(*) unsaved note: lock changed");
+            }
             self.is_locked = on;
             self.is_dirty = true;
         }
@@ -145,6 +158,10 @@ impl NoteData {
 
     pub fn set_visibility(&mut self, on: bool) {
         if self.is_visible != on {
+            if ! self.is_dirty {
+                // report only once
+                tracing::debug!("(*) unsaved note: visibility changed");
+            }
             self.is_visible = on;
             self.is_dirty = true;
         }
@@ -152,6 +169,10 @@ impl NoteData {
 
     pub fn set_style(&mut self, style_id: Uuid) {
         if self.style_id != style_id {
+            if ! self.is_dirty {
+                // report only once
+                tracing::debug!("(*) unsaved note: style changed");
+            }
             self.style_id = style_id;
             self.is_dirty = true;
         }
