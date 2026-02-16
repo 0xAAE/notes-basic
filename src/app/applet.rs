@@ -1,6 +1,8 @@
-use std::collections::HashMap;
-
-use crate::{app::Command, config::Config, fl, icons};
+use crate::{
+    app::{Command, build_main_popup_view},
+    config::Config,
+    icons,
+};
 use cosmic::prelude::*;
 use cosmic::{
     applet,
@@ -8,12 +10,12 @@ use cosmic::{
     dbus_activation::DbusActivationInterfaceProxy,
     desktop,
     iced::{
-        self, Alignment, Limits, Subscription,
-        widget::column,
+        self, Limits, Subscription,
         window::{self, Id},
     },
     widget,
 };
+use std::collections::HashMap;
 
 /// Messages emitted by the application and its widgets.
 #[derive(Debug, Clone)]
@@ -117,7 +119,7 @@ impl cosmic::Application for AppletModel {
         if let Some(window_id) = self.main_popup_id
             && window_id == id
         {
-            self.build_main_popup_view()
+            build_main_popup_view(self.core(), Message::Signal, |_| true)
         } else {
             widget::text("").into()
         }
@@ -244,62 +246,6 @@ impl AppletModel {
             .max_height(500.0)
             .max_width(500.0);
         cosmic::iced::platform_specific::shell::commands::popup::get_popup(popup_settings)
-    }
-
-    fn build_main_popup_view(&self) -> Element<'_, Message> {
-        let save_load = column![
-            applet::menu_button(widget::text::body(fl!("load")))
-                .on_press(Message::Signal(Command::LoadNotes)),
-            applet::menu_button(widget::text::body(fl!("save")))
-                .on_press(Message::Signal(Command::SaveNotes)),
-        ];
-        let import_export = column![
-            applet::menu_button(widget::text::body(fl!("import")))
-                .on_press(Message::Signal(Command::ImportNotes)),
-            applet::menu_button(widget::text::body(fl!("export")))
-                .on_press(Message::Signal(Command::ExportNotes)),
-        ];
-        let show_lock = column![
-            applet::menu_button(widget::text::body(fl!("show-all")))
-                .on_press(Message::Signal(Command::ShowAllNotes)),
-            applet::menu_button(widget::text::body(fl!("hide-all")))
-                .on_press(Message::Signal(Command::HideAllNotes)),
-            applet::menu_button(widget::text::body(fl!("lock-all")))
-                .on_press(Message::Signal(Command::LockAll)),
-        ];
-        let settings_restore = column![
-            applet::menu_button(widget::text::body(fl!("restore-notes")))
-                .on_press(Message::Signal(Command::RestoreNotes)),
-            applet::menu_button(widget::text::body(fl!("settings")))
-                .on_press(Message::Signal(Command::OpenSettings)),
-            applet::menu_button(widget::text::body(fl!("about")))
-                .on_press(Message::Signal(Command::OpenAbout)),
-            applet::menu_button(widget::text::body(fl!("quit")))
-                .on_press(Message::Signal(Command::Quit)),
-        ];
-
-        let spacing = cosmic::theme::spacing();
-        let content = column![
-            save_load,
-            applet::padded_control(widget::divider::horizontal::default())
-                .padding([spacing.space_xxs, spacing.space_s]),
-            import_export,
-            applet::padded_control(widget::divider::horizontal::default())
-                .padding([spacing.space_xxs, spacing.space_s]),
-            show_lock,
-            applet::padded_control(widget::divider::horizontal::default())
-                .padding([spacing.space_xxs, spacing.space_s]),
-            settings_restore
-        ]
-        .align_x(Alignment::Start)
-        .padding([8, 0]);
-
-        self.core
-            .applet
-            .popup_container(content)
-            .max_height(500.)
-            .max_width(500.)
-            .into()
     }
 
     fn try_build_dbus_proxy(&self) -> Task<cosmic::Action<Message>> {

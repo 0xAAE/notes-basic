@@ -123,8 +123,16 @@ impl StickyWindow {
         {
             let is_locked = note.is_locked();
 
-            let mut note_toolbar = widget::row::with_capacity(7)
+            let mut note_toolbar = widget::row::with_capacity(8)
                 .spacing(cosmic::theme::spacing().space_s)
+                .push(
+                    icons
+                        .menu()
+                        .apply(widget::button::icon)
+                        .icon_size(self.icon_size)
+                        .on_press(Message::OpenMenu(window_id))
+                        .width(Length::Shrink),
+                )
                 .push(
                     if is_locked {
                         icons.unlock()
