@@ -1,10 +1,13 @@
 use cosmic::widget::icon::Handle;
+
+const ICON_NOTES: &[u8] =
+    include_bytes!("../resources/icons/hicolor/scalable/apps/com.github.aae.sticky_notes.svg");
+
 // embedded SVG bytes
 #[cfg(not(feature = "xdg_icons"))]
 pub mod inner {
     use cosmic::widget::icon::{self, Handle};
 
-    const ICON_NOTES: &[u8] = include_bytes!("../resources/icons/hicolor/scalable/apps/notes.svg");
     const ICON_UNLOCKED: &[u8] =
         include_bytes!("../resources/icons/mono/scalable/changes-allow-symbolic.svg");
     const ICON_LOCKED: &[u8] =
@@ -36,7 +39,7 @@ pub mod inner {
     impl IconSet {
         pub fn new() -> Self {
             Self {
-                notes: icon::from_svg_bytes(ICON_NOTES),
+                notes: icon::from_svg_bytes(super::ICON_NOTES),
                 lock: icon::from_svg_bytes(ICON_UNLOCKED),
                 unlock: icon::from_svg_bytes(ICON_LOCKED),
                 edit: icon::from_svg_bytes(ICON_EDIT),
@@ -54,8 +57,6 @@ pub mod inner {
 #[cfg(feature = "xdg_icons")]
 mod inner {
     use cosmic::widget::icon::{self, Handle};
-
-    const ICON_NOTES: &[u8] = include_bytes!("../resources/icons/hicolor/scalable/apps/notes.svg");
 
     pub const XDG_UNLOCKED: &str = "changes-allow-symbolic";
     pub const XDG_LOCKED: &str = "changes-prevent-symbolic";
@@ -81,7 +82,7 @@ mod inner {
     impl IconSet {
         pub fn new() -> Self {
             Self {
-                notes: icon::from_svg_bytes(ICON_NOTES),
+                notes: icon::from_svg_bytes(super::ICON_NOTES),
                 lock: icon::from_name(XDG_UNLOCKED).into(),
                 unlock: icon::from_name(XDG_LOCKED).into(),
                 edit: icon::from_name(XDG_EDIT).into(),

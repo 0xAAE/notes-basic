@@ -1,5 +1,13 @@
-# Name of the application's binary.
+# Name of the application's project.
 name := 'sticky-notes'
+
+# Name of the application's applet binary.
+applet := 'notes-applet'
+
+
+# Name of the application's service binary.
+service := 'notes-service'
+
 # The unique ID of the application.
 appid := 'com.github.aae.sticky_notes'
 
@@ -20,18 +28,17 @@ icon-svg := appid + '.svg'
 # Install destinations
 base-dir := absolute_path(clean(rootdir / prefix))
 appdata-dst := base-dir / 'share' / 'appdata' / appdata
-bin-dst := base-dir / 'bin' / name
+bin-dst-app := base-dir / 'bin' / applet
+bin-dst-svc := base-dir / 'bin' / service
 desktop-dst := base-dir / 'share' / 'applications' / desktop
 icons-dst := base-dir / 'share' / 'icons' / 'hicolor'
-icon-svg-dst := icons-dst / 'scalable' / 'apps'
+icon-svg-dst := icons-dst / 'scalable' / 'apps' / icon-svg
 
-applet := 'notes-applet'
-service := 'notes-service'
+# Logging configuration
 log-tracing := 'warn,sticky_notes=trace'
 
-# Default recipe
-default: (rund-applet)
-#    env RUST_BACKTRACE=full RUST_LOG={{log-tracing}} cargo run --bin {{applet}}
+# Default recipe: check, build with debug profile, run applet (which will launch service)
+default: check debug rund-applet
 
 # Runs `cargo clean`
 clean:
@@ -63,38 +70,45 @@ check-json: (check '--message-format=json')
 
 # Compiles all targets with release profile
 release:
-    cargo build --release --bin notes-service --bin notes-applet
+    #cargo build --release --bin notes-service --bin notes-applet
+    cargo build --release --bin {{service}} --bin {{applet}}
 
 # Compiles all targets with debug profile
 debug:
-    cargo build --bin notes-service --bin notes-applet
+    #cargo build --bin notes-service --bin notes-applet
+    cargo build --bin {{service}} --bin {{applet}}
 
 # Run the application for debugging purposes
 rund *args:
     env RUST_BACKTRACE=full RUST_LOG={{log-tracing}} cargo run --bin {{args}}
 
-rund-applet: (rund 'notes-applet')
+# Run applet (debug)
+rund-applet: (rund applet)
 
-rund-service: (rund 'notes-service')
+# Run service (debug)
+rund-service: (rund service)
 
 # Run the application for testing purposes
 run *args:
     env RUST_BACKTRACE=full RUST_LOG={{log-tracing}} cargo run --release --bin {{args}}
 
-run-applet: (run 'notes-applet')
+# Run applet (release)
+run-applet: (run applet)
 
-run-service: (run 'notes-service')
+# Run service (release)
+run-service: (run service)
 
 # Installs files
 install:
-    install -Dm0755 {{ cargo-target-dir / 'release' / name }} {{bin-dst}}
+    install -Dm0755 {{ cargo-target-dir / 'release' / applet }} {{bin-dst-app}}
+    install -Dm0755 {{ cargo-target-dir / 'release' / service }} {{bin-dst-svc}}
     install -Dm0644 {{ 'resources' / desktop }} {{desktop-dst}}
     install -Dm0644 {{ 'resources' / appdata }} {{appdata-dst}}
-    install -Dm0644 {{ 'resources' / 'icons' / 'hicolor' / 'scalable' / 'apps' / 'notes.svg' }} {{icon-svg-dst}}
+    install -Dm0644 {{ 'resources' / 'icons' / 'hicolor' / 'scalable' / 'apps' / icon-svg }} {{icon-svg-dst}}
 
 # Uninstalls installed files
 uninstall:
-    rm {{bin-dst}} {{desktop-dst}} {{icon-svg-dst}}
+    rm {{bin-dst-app}} {{bin-dst-svc}} {{desktop-dst}} {{appdata-dst}} {{icon-svg-dst}}
 
 # Vendor dependencies locally
 vendor:

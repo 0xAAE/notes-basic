@@ -4,7 +4,7 @@
   <metadata_license>CC0-1.0</metadata_license>
   <project_license>MPL-2.0</project_license>
   <name>Sticky Notes</name>
-  <summary>Implementation of sticky notes for Cosmmic desktop environment</summary>
+  <summary>Implementation of sticky notes for Cosmic desktop environment</summary>
   <icon type="remote" width="64" height="64" scale="1">
     https://github.com/0xAAE/sticky-notes/raw/main/resources/icons/hicolor/scalable/notes.svg
   </icon>
@@ -14,6 +14,7 @@
     <id>com.github.aae.sticky_notes</id>
     <binaries>
       <binary>notes-applet</binary>
+      <binary>notes-service</binary>
     </binaries>
   </provides>
   <requires>
