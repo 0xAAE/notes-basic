@@ -4,6 +4,7 @@ use crate::{
     app::{
         Command,
         about_window::AboutWindow,
+        build_main_popup_view,
         edit_style::EditStyleDialog,
         restore_view::build_restore_view,
         settings_view::build_settings_view,
@@ -21,7 +22,7 @@ use cosmic::{
     cosmic_config::{self, ConfigSet, CosmicConfigEntry},
     dbus_activation,
     iced::{
-        self, Color, Event, Point, Size, Subscription,
+        self, Color, Event, Limits, Point, Size, Subscription,
         core::mouse::Button as MouseButton,
         event::Status as EventStatus,
         mouse::Event as MouseEvent,
@@ -44,6 +45,8 @@ impl CosmicFlags for ServiceFlags {
 pub enum Message {
     // Applet menu commands
     Signal(Command),
+    // Service menu command
+    OpenMenu(Id),
     // Notification about config changes
     UpdateConfig(Config),
     // Windows creating
@@ -109,6 +112,8 @@ pub struct ServiceModel {
     sticky_windows: HashMap<Id, StickyWindow>,
     // Window is under cursor at the moment
     cursor_window: Option<Id>,
+    // Popup menu
+    popup_menu_id: Option<Id>,
     #[cfg(not(feature = "xdg_icons"))]
     icons: icons::IconSet,
     #[cfg(feature = "xdg_icons")]
@@ -170,6 +175,7 @@ impl cosmic::Application for ServiceModel {
             about_window: None,
             sticky_windows: HashMap::new(),
             cursor_window: None,
+            popup_menu_id: None,
             icons: icons::IconSet::new(),
         };
 
@@ -235,6 +241,14 @@ impl cosmic::Application for ServiceModel {
                 .class(cosmic::style::Container::Background)
                 .padding(cosmic::theme::spacing().space_s)
                 .into()
+        } else if let Some(window_id) = self.popup_menu_id
+            && window_id == id
+        {
+            build_main_popup_view(self.core(), Message::Signal, |cmd| match cmd {
+                // some commands are senseless when working through the sticky window menu
+                Command::HideAllNotes | Command::ShowAllNotes => false,
+                _ => true,
+            })
         } else {
             widget::text("").into()
         }
@@ -309,6 +323,11 @@ impl cosmic::Application for ServiceModel {
         match message {
             Message::Signal(command) => {
                 return self.on_signal(&command);
+            }
+
+            Message::OpenMenu(window_id) => {
+                tracing::debug!("sticky-window {window_id}: open menu");
+                return self.open_popup(window_id);
             }
 
             Message::UpdateConfig(config) => {
@@ -553,6 +572,34 @@ impl cosmic::Application for ServiceModel {
 }
 
 impl ServiceModel {
+    fn _close_popup(&mut self) -> Task<cosmic::Action<Message>> {
+        if let Some(p) = self.popup_menu_id.take() {
+            tracing::debug!("destroying popup menu");
+            cosmic::iced::platform_specific::shell::commands::popup::destroy_popup(p)
+        } else {
+            Task::none()
+        }
+    }
+
+    fn open_popup(&mut self, parent_window_id: Id) -> Task<cosmic::Action<Message>> {
+        tracing::debug!("build popup menu");
+        let new_id = window::Id::unique();
+        self.popup_menu_id.replace(new_id);
+        let mut popup_settings = self.core.applet.get_popup_settings(
+            parent_window_id,
+            new_id,
+            Some((500, 500)),
+            None,
+            None,
+        );
+        popup_settings.positioner.size_limits = Limits::NONE
+            .min_width(100.0)
+            .min_height(100.0)
+            .max_height(500.0)
+            .max_width(500.0);
+        cosmic::iced::platform_specific::shell::commands::popup::get_popup(popup_settings)
+    }
+
     fn on_signal(&mut self, command: &Command) -> Task<cosmic::Action<Message>> {
         tracing::trace!("handling command {command}");
         match command {

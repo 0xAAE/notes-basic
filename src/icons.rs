@@ -23,6 +23,8 @@ pub mod inner {
         include_bytes!("../resources/icons/mono/scalable/edit-undo-symbolic.svg");
     const ICON_CHECKED: &[u8] =
         include_bytes!("../resources/icons/mono/scalable/checkbox-checked-symbolic.svg");
+    const ICON_MENU: &[u8] =
+        include_bytes!("../resources/icons/mono/scalable/open-menu-symbolic.svg");
 
     pub struct IconSet {
         pub notes: Handle,
@@ -34,6 +36,7 @@ pub mod inner {
         pub delete: Handle,
         pub undo: Handle,
         pub checked: Handle,
+        pub menu: Handle,
     }
 
     impl IconSet {
@@ -48,6 +51,7 @@ pub mod inner {
                 delete: icon::from_svg_bytes(ICON_DELETE),
                 undo: icon::from_svg_bytes(ICON_UNDO),
                 checked: icon::from_svg_bytes(ICON_CHECKED),
+                menu: icon::from_svg_bytes(ICON_MENU),
             }
         }
     }
@@ -66,6 +70,7 @@ mod inner {
     pub const XDG_DOWN: &str = "pan-down-symbolic";
     pub const XDG_UNDO: &str = "edit-undo-symbolic";
     pub const XDG_CHECKED: &str = "checkbox-checked-symbolic";
+    pub const XDG_MENU: &str = "open-menu-symbolic";
 
     pub struct IconSet {
         pub notes: Handle,
@@ -77,6 +82,7 @@ mod inner {
         pub delete: Handle,
         pub undo: Handle,
         pub checked: Handle,
+        pub menu: Handle,
     }
 
     impl IconSet {
@@ -91,6 +97,7 @@ mod inner {
                 delete: icon::from_name(XDG_DELETE).into(),
                 undo: icon::from_name(XDG_UNDO).into(),
                 checked: icon::from_name(XDG_CHECKED).into(),
+                menu: icon::from_name(XDG_MENU).into(),
             }
         }
     }
@@ -148,5 +155,9 @@ impl IconSet {
 
     pub fn checked(&self) -> Handle {
         self.inner.checked.clone()
+    }
+
+    pub fn menu(&self) -> Handle {
+        self.inner.menu.clone()
     }
 }
