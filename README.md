@@ -8,6 +8,55 @@ There are two components in sticky-notes
 
 Other details is to be provided when version 0.1.0 has come
 
+## Quick start
+
+### Prerequisites
+
+#### Common
+
+* [rust]. The recommended way to install with rustup is a good choice: 
+```
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+```
+* [casey/just][just]. Because the project sticky-notes is built with cargo and rust compiler the good choice to install just is 
+```
+cargo install just
+```
+
+#### Ubuntu 24.04, Pop!_OS 24.04
+
+* library xkbcommon (Otherwise the compilation error will occur: "The system library `xkbcommon` required by crate `smithay-client-toolkit` was not found"). The command to install the library in Ubuntu or Pop!_OS
+```
+sudo apt install libxkbcommon-dev
+```
+
+### Build from source code
+
+* Open terminal
+* Create working directory to host the project code and temporary files. Example
+```
+mkdir ~/build
+cd ~/build
+```
+* Clone the project
+```
+git clone https://github.com/0xAAE/sticky-notes.git
+cd sticky-notes
+```
+* Build release version
+```
+just release
+```
+* (optional) Run to test everything is good in terminal
+```
+just run-service
+```
+Stop notes-service in terminal with `Ctrl-C`
+* Install sticky-notes
+```
+sudo just install
+```
+
 ## Configuration
 
 The path to configuration is `~/.config/cosmic/com.github.aae/sticky_notes/v1`.
@@ -106,7 +155,7 @@ Value type: `JSON string` (i.e. in double quotes).
 :exclamation: Edit carefully otherwise it won't be read properly. It is highly recommended to edit notes in sticky windows and settings
 
 
-## Build, install and run (current version only)
+## Build, install and run
 
 There are two components must start
 
@@ -117,15 +166,25 @@ There are two components must start
 
 A [justfile](./justfile) is included by default for the [casey/just][just] command runner.
 
-- `just` does the same as `just rund-applet`
+### Develop and build
+- `just` does the same as 
+```
+just check
+just debug
+just rund-applet
+```
+- `just debug` builds both *notes-applet* and *notes-service* with debug profile
+- `just release` builds both *notes-applet* and *notes-service* with release profile
+- `just check` runs clippy on the project to check for linter warnings
+- `cargo test` invokes all unit tests
+### Run
 - `just rund-service` builds and runs the *notes-service* with debug profile
 - `just rund-applet` builds and runs the *notes-applet* with debug profile
 - `just run-service` builds and runs the *notes-service* with release profile
 - `just run-applet` builds and runs the *notes-applet* with release profile
-- `just debug` builds both *notes-applet* and *notes-service* with debug profile
-- `just release` builds both *notes-applet* and *notes-service* with release profile
-- `just install` installs the project into the system
-- `just check` runs clippy on the project to check for linter warnings
-- `cargo test` performs all unit tests
+### Install
+- `sudo just install` installs the project into the system
+- `sudo just uninstall` uninstalls the project from the system
 
+[rust]: https://rust-lang.org/tools/install
 [just]: https://github.com/casey/just
