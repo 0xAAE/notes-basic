@@ -25,10 +25,11 @@ pub struct EditStyleDialog {
     color_picker_model: widget::ColorPickerModel,
     avail_fonts: Vec<String>,
     font_size_text: String,
+    is_new: bool,
 }
 
 impl EditStyleDialog {
-    pub fn new(style_id: Uuid, style: &NoteStyle) -> Self {
+    pub fn new(style_id: Uuid, style: &NoteStyle, is_new: bool) -> Self {
         let font = style.get_font().clone();
         let font_size_text = font.size.to_string();
         Self {
@@ -44,7 +45,12 @@ impl EditStyleDialog {
             ),
             avail_fonts: get_avail_fonts().iter().map(ToString::to_string).collect(),
             font_size_text,
+            is_new,
         }
+    }
+
+    pub fn is_new_style(&self) -> bool {
+        self.is_new
     }
 
     pub fn update_name(&mut self, name: String) {
