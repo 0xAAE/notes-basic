@@ -74,6 +74,17 @@ Example: `"/home/user/.bin/notes-service"`
 
 Default value: `"/usr/local/bin/notes-service"`
 
+### connect_service_pause_ms
+optional
+
+When *notes-applet* starts it connects the *notes-service*. If connecting fails the applet launches the service (defined in *service_bin*), then it waits some time and retries to connect after that again. This parameter defines in milliseconds how long the applet will wait before retrying to connect the service.
+
+Value type: `integer`
+
+Example: `2_000`
+
+Default value: `1_000`
+
 ### import_file
 optional
 
@@ -139,7 +150,7 @@ optional
 
 Overrides the size of icons in the sticky window toolbar.
 
-Value type: integer
+Value type: `integer`
 
 Example: `32`
 
@@ -153,7 +164,6 @@ Contains sticky-notes database.
 Value type: `JSON string` (i.e. in double quotes).
 
 :exclamation: Edit carefully otherwise it won't be read properly. It is highly recommended to edit notes in sticky windows and settings
-
 
 ## Build, install and run
 

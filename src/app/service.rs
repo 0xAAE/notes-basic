@@ -721,7 +721,7 @@ impl ServiceModel {
                 tracing::info!("handling dbus_activation message {}", &action_name);
                 match Command::from_str(action_name.as_str()) {
                     Ok(cmd) => {
-                        return Task::done(cosmic::Action::App(Message::Signal(cmd)));
+                        return Task::done(Message::Signal(cmd).into());
                     }
                     Err(e) => tracing::error!("{e}"),
                 }
@@ -991,12 +991,10 @@ impl ServiceModel {
                 if let Some(cursor_id) = self.cursor_window
                     && cursor_id == id
                 {
-                    return self
-                        .core
-                        .drag(None)
-                        .chain(window::get_position(id).map(move |pos| {
-                            cosmic::Action::App(Message::WindowPositionResponse((id, pos)))
-                        }));
+                    return self.core.drag(None).chain(
+                        window::get_position(id)
+                            .map(move |pos| Message::WindowPositionResponse((id, pos)).into()),
+                    );
                 }
             }
             MouseEvent::CursorEntered => {
@@ -1082,8 +1080,7 @@ impl ServiceModel {
         });
         (
             id,
-            spawn_window
-                .map(move |id| cosmic::Action::App(Message::StickyWindowCreated(id, note_id))),
+            spawn_window.map(move |id| Message::StickyWindowCreated(id, note_id).into()),
         )
     }
 
@@ -1092,7 +1089,7 @@ impl ServiceModel {
             size: self.config.restore_notes_size(),
             ..Default::default()
         });
-        let task = spawn_window.map(|id| cosmic::Action::App(Message::RestoreWindowCreated(id)));
+        let task = spawn_window.map(|id| Message::RestoreWindowCreated(id).into());
         if let Some(existing_window_id) = self.restore_window_id {
             tracing::debug!("force closing existing 'restore' window");
             window::close(existing_window_id).chain(task)
@@ -1103,7 +1100,7 @@ impl ServiceModel {
 
     fn spawn_settings_window(&mut self) -> Task<cosmic::Action<Message>> {
         let (_id, spawn_window) = window::open(window::Settings::default());
-        let task = spawn_window.map(|id| cosmic::Action::App(Message::SettingsWindowCreated(id)));
+        let task = spawn_window.map(|id| Message::SettingsWindowCreated(id).into());
         if let Some(existing_window_id) = std::mem::take(&mut self.settings_window_id) {
             tracing::debug!("force closing existing 'settings' window");
             window::close(existing_window_id).chain(task)
@@ -1117,7 +1114,7 @@ impl ServiceModel {
             size: self.config.about_size(),
             ..Default::default()
         });
-        let task = spawn_window.map(|id| cosmic::Action::App(Message::AboutWindowCreated(id)));
+        let task = spawn_window.map(|id| Message::AboutWindowCreated(id).into());
         if let Some((existing_window_id, _about_window)) = std::mem::take(&mut self.about_window) {
             tracing::debug!("force closing existing 'about' window");
             window::close(existing_window_id).chain(task)
@@ -1135,9 +1132,8 @@ impl ServiceModel {
             size: self.config.edit_style_size(),
             ..Default::default()
         });
-        let task = spawn_window.map(move |id| {
-            cosmic::Action::App(Message::EditStyleWindowCreated(id, style_id, is_new))
-        });
+        let task = spawn_window
+            .map(move |id| Message::EditStyleWindowCreated(id, style_id, is_new).into());
         if let Some((existing_window_id, _edit_style)) = std::mem::take(&mut self.edit_style) {
             tracing::debug!("force closing existing 'edit style' window");
             window::close(existing_window_id).chain(task)

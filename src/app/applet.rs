@@ -15,7 +15,7 @@ use cosmic::{
     },
     widget,
 };
-use std::collections::HashMap;
+use std::{collections::HashMap, time::Duration};
 
 /// Messages emitted by the application and its widgets.
 #[derive(Debug, Clone)]
@@ -27,6 +27,7 @@ pub enum Message {
     SignalResult(Command, bool), // (command, success or not)
     ZbusConnection(zbus::Result<zbus::Connection>),
     DbusProxy(zbus::Result<DbusActivationInterfaceProxy<'static>>),
+    Timeout(u64), // waiting for u64 milliseconds have completed
 }
 
 pub struct AppletModel {
@@ -96,7 +97,7 @@ impl cosmic::Application for AppletModel {
         };
 
         let zbus_session_cmd = Task::perform(zbus::Connection::session(), |res| {
-            cosmic::Action::App(Message::ZbusConnection(res))
+            Message::ZbusConnection(res).into()
         });
 
         (app, zbus_session_cmd)
@@ -195,7 +196,7 @@ impl cosmic::Application for AppletModel {
             Message::Signal(command) => {
                 tracing::debug!("requested {command}");
                 // toggle (actually close) Popup, then send signal via DBus
-                return Task::done(cosmic::Action::App(Message::TogglePopup))
+                return Task::done(Message::TogglePopup.into())
                     .chain(self.send_command_via_dbus(command));
             }
 
@@ -204,11 +205,26 @@ impl cosmic::Application for AppletModel {
                     tracing::debug!("successfully sent {command}");
                 } else {
                     tracing::warn!("failed sending {command}");
+                    if command == Command::Connect {
+                        // waiting for a while to prevent spamming with attempts to connect the service, then repeat connecting again
+                        let pause = self.config.connect_service_pause_ms;
+                        let command_clone = command.clone();
+                        return Task::future(async move {
+                            tracing::warn!("wait for {pause} msec then repeat {command_clone}");
+                            tokio::time::sleep(Duration::from_millis(pause)).await;
+                            Message::Timeout(pause).into()
+                        })
+                        .chain(self.send_command_via_dbus(command));
+                    }
                 }
                 if let Command::Quit = command {
                     tracing::info!("finish working due to QUIT was sent to service");
                     return iced::exit();
                 }
+            }
+
+            Message::Timeout(ms) => {
+                tracing::debug!("waiting for {ms} msec have completed");
             }
         }
         Task::none()
@@ -260,7 +276,7 @@ impl AppletModel {
             {
                 Ok(proxy_builder) => {
                     return Task::perform(async move { proxy_builder.build().await }, |res| {
-                        cosmic::Action::App(Message::DbusProxy(res))
+                        Message::DbusProxy(res).into()
                     });
                 }
                 Err(e) => tracing::error!("failed building dbus proxy client: {e}"),
@@ -275,14 +291,14 @@ impl AppletModel {
         if let Some(mut proxy) = self.dbus_proxy.clone() {
             let command_str = command.to_string();
             let service_exec = self.config.service_bin.clone();
-            return Task::future(async move {
+            Task::future(async move {
                 if let Err(e) = proxy
                     .activate_action(command_str.as_str(), Vec::new(), HashMap::new())
                     .await
                 {
                     tracing::error!("failed sending {command_str}: {e}");
                     if command == Command::Quit {
-                        tracing::info!("don't try to launch service because stop working");
+                        tracing::info!("skip trying to launch service because stop working");
                     } else {
                         //todo: test error before spawning service; valid candidates are: InterfaceNotFound, Failure(e)
                         tracing::info!("trying to launch notes-service binary: {}", &service_exec);
@@ -293,14 +309,14 @@ impl AppletModel {
                             false,
                         )
                         .await;
-                        //todo: consider waiting for a while to prevent spamming with calls to spawn_desktop_exec(), then repeat command again
                     }
-                    cosmic::Action::App(Message::SignalResult(command, false))
+                    Message::SignalResult(command, false).into()
                 } else {
-                    cosmic::Action::App(Message::SignalResult(command, true))
+                    Message::SignalResult(command, true).into()
                 }
-            });
+            })
+        } else {
+            Task::none()
         }
-        Task::none()
     }
 }
