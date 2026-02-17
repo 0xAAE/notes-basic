@@ -39,9 +39,6 @@ pub struct AppletModel {
     zbus_connection: Option<zbus::Connection>,
     dbus_proxy: Option<DbusActivationInterfaceProxy<'static>>,
     dbus_object_path: String,
-    #[cfg(not(feature = "xdg_icons"))]
-    icons: icons::IconSet,
-    #[cfg(feature = "xdg_icons")]
     icons: icons::IconSet,
 }
 
