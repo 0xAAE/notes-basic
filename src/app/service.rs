@@ -116,9 +116,6 @@ pub struct ServiceModel {
     popup_menu_id: Option<Id>,
     // Applet is connected
     applet_connected: bool,
-    #[cfg(not(feature = "xdg_icons"))]
-    icons: icons::IconSet,
-    #[cfg(feature = "xdg_icons")]
     icons: icons::IconSet,
 }
 

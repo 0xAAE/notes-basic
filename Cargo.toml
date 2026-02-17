@@ -9,8 +9,8 @@ default-run = "notes-service"
 
 [features]
 default = []
-# to not embed svg files into binary and use XDG system-wide icons instead:
-xdg_icons = []
+# to embed svg files into binary and don't use XDG system-wide icons instead:
+embed_icons = []
 applet_popup = []
 
 [dependencies]
