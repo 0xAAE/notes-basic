@@ -4,11 +4,10 @@ use crate::{
     app::{
         Command,
         about_window::AboutWindow,
-        build_main_popup_view,
         edit_style::EditStyleDialog,
         restore_view::build_restore_view,
         settings_view::build_settings_view,
-        sticky_window::StickyWindow,
+        sticky_window::{PopupVariant, StickyWindow},
         utils::{to_f32, to_usize},
     },
     config::Config,
@@ -22,7 +21,7 @@ use cosmic::{
     cosmic_config::{self, ConfigSet, CosmicConfigEntry},
     dbus_activation,
     iced::{
-        self, Color, Event, Limits, Point, Size, Subscription,
+        self, Color, Event, Point, Size, Subscription,
         core::mouse::Button as MouseButton,
         event::Status as EventStatus,
         mouse::Event as MouseEvent,
@@ -30,6 +29,7 @@ use cosmic::{
     },
     widget,
 };
+use palette::bool_mask::BoolMask;
 use std::{collections::HashMap, str::FromStr};
 use uuid::Uuid;
 
@@ -45,7 +45,7 @@ impl CosmicFlags for ServiceFlags {
 pub enum Message {
     // Applet menu commands
     Signal(Command),
-    // Service menu command
+    // To open menu by service
     OpenMenu(Id),
     // Notification about config changes
     UpdateConfig(Config),
@@ -114,6 +114,8 @@ pub struct ServiceModel {
     cursor_window: Option<Id>,
     // Popup menu
     popup_menu_id: Option<Id>,
+    // Applet is connected
+    applet_connected: bool,
     #[cfg(not(feature = "xdg_icons"))]
     icons: icons::IconSet,
     #[cfg(feature = "xdg_icons")]
@@ -176,6 +178,7 @@ impl cosmic::Application for ServiceModel {
             sticky_windows: HashMap::new(),
             cursor_window: None,
             popup_menu_id: None,
+            applet_connected: false,
             icons: icons::IconSet::new(),
         };
 
@@ -244,7 +247,7 @@ impl cosmic::Application for ServiceModel {
         } else if let Some(window_id) = self.popup_menu_id
             && window_id == id
         {
-            build_main_popup_view(self.core(), Message::Signal, |cmd| match cmd {
+            super::build_main_popup_view(self.core(), Message::Signal, |cmd| match cmd {
                 // some commands are senseless when working through the sticky window menu
                 Command::HideAllNotes | Command::ShowAllNotes => false,
                 _ => true,
@@ -366,9 +369,19 @@ impl cosmic::Application for ServiceModel {
 
             // message related to windows management
             Message::StickyWindowCreated(id, note_id) => {
+                #[cfg(feature = "applet_popup")]
+                let popup_variant = PopupVariant::AppletMenu;
+
+                #[cfg(not(feature = "applet_popup"))]
+                let popup_variant = PopupVariant::DropdownMenu(super::build_popup_list());
+
                 self.sticky_windows.insert(
                     id,
-                    StickyWindow::new(note_id, self.config.toolbar_icon_size),
+                    StickyWindow::new(
+                        note_id,
+                        self.config.toolbar_icon_size,
+                        self.applet_connected.is_false().then_some(popup_variant),
+                    ),
                 );
                 if let Ok(note) = self.notes.try_get_note(&note_id) {
                     return self.set_window_title(note.get_title().to_string(), id);
@@ -572,15 +585,17 @@ impl cosmic::Application for ServiceModel {
 }
 
 impl ServiceModel {
-    fn _close_popup(&mut self) -> Task<cosmic::Action<Message>> {
-        if let Some(p) = self.popup_menu_id.take() {
-            tracing::debug!("destroying popup menu");
-            cosmic::iced::platform_specific::shell::commands::popup::destroy_popup(p)
-        } else {
-            Task::none()
-        }
+    #[cfg(not(feature = "applet_popup"))]
+    fn open_popup(&mut self, _parent_window_id: Id) -> Task<cosmic::Action<Message>> {
+        Task::none()
     }
 
+    #[cfg(not(feature = "applet_popup"))]
+    fn _close_popup(&mut self) -> Task<cosmic::Action<Message>> {
+        Task::none()
+    }
+
+    #[cfg(feature = "applet_popup")]
     fn open_popup(&mut self, parent_window_id: Id) -> Task<cosmic::Action<Message>> {
         tracing::debug!("build popup menu");
         let new_id = window::Id::unique();
@@ -592,7 +607,7 @@ impl ServiceModel {
             None,
             None,
         );
-        popup_settings.positioner.size_limits = Limits::NONE
+        popup_settings.positioner.size_limits = iced::Limits::NONE
             .min_width(100.0)
             .min_height(100.0)
             .max_height(500.0)
@@ -600,11 +615,30 @@ impl ServiceModel {
         cosmic::iced::platform_specific::shell::commands::popup::get_popup(popup_settings)
     }
 
+    #[cfg(feature = "applet_popup")]
+    fn _close_popup(&mut self) -> Task<cosmic::Action<Message>> {
+        if let Some(p) = self.popup_menu_id.take() {
+            tracing::debug!("destroying popup menu");
+            cosmic::iced::platform_specific::shell::commands::popup::destroy_popup(p)
+        } else {
+            Task::none()
+        }
+    }
+
     fn on_signal(&mut self, command: &Command) -> Task<cosmic::Action<Message>> {
         tracing::trace!("handling command {command}");
         match command {
-            Command::Ping => {
+            Command::Ignored => {
                 // nothing to do
+            }
+
+            Command::Connect => {
+                tracing::debug!("notes-applet is connected; hide menu in sticky windows");
+                self.applet_connected = true;
+                // hide menu in existing sticky windows
+                self.sticky_windows
+                    .values_mut()
+                    .for_each(StickyWindow::hide_popup_menu);
             }
 
             Command::Quit => {
