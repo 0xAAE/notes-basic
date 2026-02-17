@@ -25,6 +25,7 @@ pub struct Config {
     pub toolbar_icon_size: u16,
     pub note_min_width: usize,
     pub note_min_height: usize,
+    pub connect_service_pause_ms: u64,
 }
 
 impl Default for Config {
@@ -48,6 +49,7 @@ impl Default for Config {
             note_min_width: 64,
             note_min_height: 64,
             toolbar_icon_size: ICON_SIZE,
+            connect_service_pause_ms: 1_000,
         }
     }
 }
