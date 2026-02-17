@@ -11,6 +11,7 @@ default-run = "notes-service"
 default = []
 # to not embed svg files into binary and use XDG system-wide icons instead:
 xdg_icons = []
+applet_popup = []
 
 [dependencies]
 anyhow = "1.0"

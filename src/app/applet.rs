@@ -189,7 +189,7 @@ impl cosmic::Application for AppletModel {
                 );
                 self.dbus_proxy = Some(proxy);
                 // test service availability, this will try to launch service if unavailable:
-                return self.send_command_via_dbus(Command::Ping);
+                return self.send_command_via_dbus(Command::Connect);
             }
 
             Message::Signal(command) => {
@@ -281,16 +281,20 @@ impl AppletModel {
                     .await
                 {
                     tracing::error!("failed sending {command_str}: {e}");
-                    //todo: test error before spawning service; valid candidates are: InterfaceNotFound, Failure(e)
-                    tracing::info!("trying to launch notes-service binary: {}", &service_exec);
-                    desktop::spawn_desktop_exec(
-                        service_exec.as_str(),
-                        Vec::<(String, String)>::new(),
-                        Some(<Self as cosmic::Application>::APP_ID),
-                        false,
-                    )
-                    .await;
-                    //todo: consider waiting for a while to prevent spamming with calls to spawn_desktop_exec(), then repeat command again
+                    if command == Command::Quit {
+                        tracing::info!("don't try to launch service because stop working");
+                    } else {
+                        //todo: test error before spawning service; valid candidates are: InterfaceNotFound, Failure(e)
+                        tracing::info!("trying to launch notes-service binary: {}", &service_exec);
+                        desktop::spawn_desktop_exec(
+                            service_exec.as_str(),
+                            Vec::<(String, String)>::new(),
+                            Some(<Self as cosmic::Application>::APP_ID),
+                            false,
+                        )
+                        .await;
+                        //todo: consider waiting for a while to prevent spamming with calls to spawn_desktop_exec(), then repeat command again
+                    }
                     cosmic::Action::App(Message::SignalResult(command, false))
                 } else {
                     cosmic::Action::App(Message::SignalResult(command, true))

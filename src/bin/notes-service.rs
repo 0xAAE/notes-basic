@@ -26,6 +26,5 @@ fn main() -> cosmic::iced::Result {
         .no_main_window(true);
 
     // Starts the application's event loop with `()` as the application's flags.
-    //cosmic::app::run::<ServiceModel>(settings, ServiceFlags)
     cosmic::app::run_single_instance::<ServiceModel>(settings, ServiceFlags)
 }

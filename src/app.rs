@@ -29,7 +29,8 @@ const APP_ID: &str = "com.github.aae.sticky_notes";
 /// Messages emitted by the application and its widgets.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Command {
-    Ping,
+    Ignored, // dummy command
+    Connect,
     Quit,
     LoadNotes,
     SaveNotes,
@@ -50,7 +51,7 @@ pub enum NotesAppError {
     ParseError(String),
 }
 
-const PING: &str = "PING";
+const CONNECT: &str = "CONNECT";
 const QUIT: &str = "QUIT";
 const LOAD: &str = "LOAD";
 const SAVE: &str = "SAVE";
@@ -62,6 +63,7 @@ const LOCK: &str = "LOCK";
 const RESTORE: &str = "RESTORE";
 const SETTINGS: &str = "SETTINGS";
 const ABOUT: &str = "ABOUT";
+const IGNORED: &str = "IGNORED";
 
 impl std::fmt::Display for Command {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -69,7 +71,8 @@ impl std::fmt::Display for Command {
             f,
             "{}",
             match self {
-                Command::Ping => PING,
+                Command::Ignored => IGNORED,
+                Command::Connect => CONNECT,
                 Command::Quit => QUIT,
                 Command::LoadNotes => LOAD,
                 Command::SaveNotes => SAVE,
@@ -91,7 +94,8 @@ impl FromStr for Command {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            PING => Ok(Self::Ping),
+            IGNORED => Ok(Command::Ignored),
+            CONNECT => Ok(Self::Connect),
             QUIT => Ok(Self::Quit),
             LOAD => Ok(Self::LoadNotes),
             SAVE => Ok(Self::SaveNotes),
@@ -105,6 +109,38 @@ impl FromStr for Command {
             ABOUT => Ok(Self::OpenAbout),
             _ => Err(NotesAppError::ParseError(s.to_string())),
         }
+    }
+}
+
+#[cfg(not(feature = "applet_popup"))]
+fn build_popup_list() -> Vec<String> {
+    vec![
+        fl!("load"),
+        fl!("save"),
+        fl!("import"),
+        fl!("export"),
+        // fl!("show-all"), // don't use without applet
+        // fl!("hide-all"), // don't use without applet
+        fl!("lock-all"),
+        fl!("restore-notes"),
+        fl!("settings"),
+        fl!("about"),
+        fl!("quit"),
+    ]
+}
+
+const fn get_popup_item_by_index(index: usize) -> Command {
+    match index {
+        0 => Command::LoadNotes,
+        1 => Command::SaveNotes,
+        2 => Command::ImportNotes,
+        3 => Command::ExportNotes,
+        4 => Command::LockAll,
+        5 => Command::RestoreNotes,
+        6 => Command::OpenSettings,
+        7 => Command::OpenAbout,
+        8 => Command::Quit,
+        _ => Command::Ignored, // dummy command
     }
 }
 

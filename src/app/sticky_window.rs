@@ -1,4 +1,5 @@
 use super::{
+    get_popup_item_by_index,
     service::Message,
     utils::{cosmic_font, with_background},
 };
@@ -28,6 +29,8 @@ pub struct StickyWindow {
     edit_context: Option<EditContext>,
     style_names: Option<Vec<String>>,
     icon_size: u16,
+    // optionally display popup menu
+    popup_menu: Option<PopupVariant>,
 }
 
 struct EditContext {
@@ -35,18 +38,31 @@ struct EditContext {
     content: widget::text_editor::Content,
 }
 
+// While feature "applet_popup" is in use only one variant is actually constructed
+#[allow(unused)]
+pub enum PopupVariant {
+    // using
+    AppletMenu,
+    DropdownMenu(Vec<String>),
+}
+
 impl StickyWindow {
-    pub fn new(note_id: Uuid, icon_size: u16) -> Self {
+    pub fn new(note_id: Uuid, icon_size: u16, popup_menu: Option<PopupVariant>) -> Self {
         Self {
             note_id,
             edit_context: None,
             style_names: None,
             icon_size,
+            popup_menu,
         }
     }
 
     pub fn get_note_id(&self) -> Uuid {
         self.note_id
+    }
+
+    pub fn hide_popup_menu(&mut self) {
+        self.popup_menu = None;
     }
 
     pub fn start_edit(&mut self, init_content: &str) -> Result<(), StickyWindowError> {
@@ -123,27 +139,37 @@ impl StickyWindow {
         {
             let is_locked = note.is_locked();
 
-            let mut note_toolbar = widget::row::with_capacity(8)
-                .spacing(cosmic::theme::spacing().space_s)
-                .push(
-                    icons
-                        .menu()
-                        .apply(widget::button::icon)
-                        .icon_size(self.icon_size)
-                        .on_press(Message::OpenMenu(window_id))
-                        .width(Length::Shrink),
-                )
-                .push(
-                    if is_locked {
-                        icons.unlock()
-                    } else {
-                        icons.lock()
-                    }
-                    .apply(widget::button::icon)
-                    .icon_size(self.icon_size)
-                    .on_press(Message::NoteLock(window_id, !is_locked))
-                    .width(Length::Shrink),
-                );
+            let mut note_toolbar =
+                widget::row::with_capacity(8).spacing(cosmic::theme::spacing().space_s);
+            // display menu variant optionally:
+            if let Some(menu) = &self.popup_menu {
+                if let PopupVariant::DropdownMenu(popup_list) = menu {
+                    note_toolbar = note_toolbar.push(widget::dropdown(popup_list, None, |index| {
+                        Message::Signal(get_popup_item_by_index(index))
+                    }));
+                } else {
+                    // PopupVariant::AppletMenu
+                    note_toolbar = note_toolbar.push(
+                        icons
+                            .menu()
+                            .apply(widget::button::icon)
+                            .icon_size(self.icon_size)
+                            .on_press(Message::OpenMenu(window_id))
+                            .width(Length::Shrink),
+                    );
+                }
+            }
+            note_toolbar = note_toolbar.push(
+                if is_locked {
+                    icons.unlock()
+                } else {
+                    icons.lock()
+                }
+                .apply(widget::button::icon)
+                .icon_size(self.icon_size)
+                .on_press(Message::NoteLock(window_id, !is_locked))
+                .width(Length::Shrink),
+            );
             if !is_locked {
                 note_toolbar = note_toolbar.push(
                     icons
