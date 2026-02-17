@@ -53,7 +53,7 @@ pub enum Message {
     StickyWindowCreated(Id, Uuid), // (window_id, note_id)
     RestoreWindowCreated(Id),
     SettingsWindowCreated(Id),
-    EditStyleWindowCreated(Id, Uuid), // (window_id, style_id)
+    EditStyleWindowCreated(Id, Uuid, bool), // (window_id, style_id, is_new)
     AboutWindowCreated(Id),
     // Settings actions
     SetDefaultStyle(usize), // set default style by index
@@ -404,13 +404,14 @@ impl cosmic::Application for ServiceModel {
                 return self.set_window_title(fl!("settings-title"), id);
             }
 
-            Message::EditStyleWindowCreated(window_id, style_id) => {
+            Message::EditStyleWindowCreated(window_id, style_id, is_new) => {
                 match self.notes.try_get_style(&style_id) {
                     Ok(style) => {
                         if self.edit_style.is_some() {
                             tracing::warn!("replacing existing edit style dialog with new one");
                         }
-                        self.edit_style = Some((window_id, EditStyleDialog::new(style_id, style)));
+                        self.edit_style =
+                            Some((window_id, EditStyleDialog::new(style_id, style, is_new)));
                         return self.set_window_title(fl!("create-new-style"), window_id);
                     }
                     Err(e) => eprint!("Failed to edit style: {e}"),
@@ -492,7 +493,7 @@ impl cosmic::Application for ServiceModel {
             }
 
             Message::StyleEdit(style_id) => {
-                return self.spawn_edit_style_window(style_id);
+                return self.spawn_edit_style_window(style_id, false);
             }
 
             Message::StyleDelete(style_id) => {
@@ -513,7 +514,10 @@ impl cosmic::Application for ServiceModel {
 
             Message::EditStyleCancel => {
                 if let Some((window_id, dialog)) = self.edit_style.take() {
-                    if let Err(e) = self.notes.delete_style(dialog.get_id()) {
+                    // must delete new style because it is in collection now
+                    if dialog.is_new_style()
+                        && let Err(e) = self.notes.delete_style(dialog.get_id())
+                    {
                         tracing::error!("failed to delete new style: {e}");
                     }
                     return window::close(window_id);
@@ -942,7 +946,7 @@ impl ServiceModel {
         self.sticky_windows
             .values_mut()
             .for_each(StickyWindow::disable_select_style);
-        self.spawn_edit_style_window(style_id)
+        self.spawn_edit_style_window(style_id, true)
     }
 
     fn on_delete_style(&mut self, style_id: Uuid) {
@@ -1122,13 +1126,18 @@ impl ServiceModel {
         }
     }
 
-    fn spawn_edit_style_window(&mut self, style_id: Uuid) -> Task<cosmic::Action<Message>> {
+    fn spawn_edit_style_window(
+        &mut self,
+        style_id: Uuid,
+        is_new: bool,
+    ) -> Task<cosmic::Action<Message>> {
         let (_id, spawn_window) = window::open(window::Settings {
             size: self.config.edit_style_size(),
             ..Default::default()
         });
-        let task = spawn_window
-            .map(move |id| cosmic::Action::App(Message::EditStyleWindowCreated(id, style_id)));
+        let task = spawn_window.map(move |id| {
+            cosmic::Action::App(Message::EditStyleWindowCreated(id, style_id, is_new))
+        });
         if let Some((existing_window_id, _edit_style)) = std::mem::take(&mut self.edit_style) {
             tracing::debug!("force closing existing 'edit style' window");
             window::close(existing_window_id).chain(task)
