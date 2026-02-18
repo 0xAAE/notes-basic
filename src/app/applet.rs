@@ -192,8 +192,8 @@ impl cosmic::Application for AppletModel {
 
             Message::Signal(command) => {
                 tracing::debug!("requested {command}");
-                // toggle (actually close) Popup, then send signal via DBus
-                return Task::done(Message::TogglePopup.into())
+                // close popup menu, then send signal via DBus
+                return Task::done(Message::ClosePopupIfOpen.into())
                     .chain(self.send_command_via_dbus(command));
             }
 

@@ -47,6 +47,7 @@ pub enum Message {
     Signal(Command),
     // To open menu by service
     OpenMenu(Id),
+    CloseMenuIfOpen,
     // Notification about config changes
     UpdateConfig(Config),
     // Windows creating
@@ -344,12 +345,16 @@ impl cosmic::Application for ServiceModel {
     fn update(&mut self, message: Self::Message) -> Task<cosmic::Action<Self::Message>> {
         match message {
             Message::Signal(command) => {
-                return self.on_signal(&command);
+                return Task::done(Message::CloseMenuIfOpen.into()).chain(self.on_signal(&command));
             }
 
             Message::OpenMenu(window_id) => {
                 tracing::debug!("sticky-window {window_id}: open menu");
                 return self.open_popup(window_id);
+            }
+
+            Message::CloseMenuIfOpen => {
+                return self.close_popup();
             }
 
             Message::UpdateConfig(config) => {
@@ -597,13 +602,22 @@ impl cosmic::Application for ServiceModel {
 
     /// Called when the escape key is pressed.
     fn on_escape(&mut self) -> Task<cosmic::Action<Self::Message>> {
+        tracing::trace!("ESC is pressed");
         if let Some(window_id) = self.core.focused_window()
             && let Some(window) = self.sticky_windows.get_mut(&window_id)
-            && let Err(e) = window.finish_edit()
+            && window.is_editing()
         {
-            tracing::error!("failed cancelling edit: {e}");
+            if let Err(e) = window.finish_edit() {
+                tracing::error!("failed finishing edit in sticky window [{window_id}]: {e}");
+            } else {
+                tracing::debug!("finished edit in sticky window [{window_id}]");
+            }
         }
-        Task::none()
+        if self.popup_menu_id.is_some() {
+            self.close_popup()
+        } else {
+            Task::none()
+        }
     }
 
     fn style(&self) -> Option<cosmic::iced_runtime::Appearance> {
@@ -618,7 +632,7 @@ impl ServiceModel {
     }
 
     #[cfg(not(feature = "applet_popup"))]
-    fn _close_popup(&mut self) -> Task<cosmic::Action<Message>> {
+    fn close_popup(&mut self) -> Task<cosmic::Action<Message>> {
         Task::none()
     }
 
@@ -643,7 +657,7 @@ impl ServiceModel {
     }
 
     #[cfg(feature = "applet_popup")]
-    fn _close_popup(&mut self) -> Task<cosmic::Action<Message>> {
+    fn close_popup(&mut self) -> Task<cosmic::Action<Message>> {
         if let Some(p) = self.popup_menu_id.take() {
             tracing::debug!("destroying popup menu");
             cosmic::iced::platform_specific::shell::commands::popup::destroy_popup(p)
@@ -1014,12 +1028,14 @@ impl ServiceModel {
         id: Id,
         event: &MouseEvent,
     ) -> Task<cosmic::Action<<ServiceModel as cosmic::Application>::Message>> {
+        tracing::trace!("mouse: {event:?}");
         match event {
             MouseEvent::ButtonPressed(MouseButton::Left) => {
                 if let Some(cursor_id) = self.cursor_window
                     && cursor_id == id
                 {
-                    return self.core.drag(Some(id));
+                    return Task::done(Message::CloseMenuIfOpen.into())
+                        .chain(self.core.drag(Some(id)));
                 }
             }
             MouseEvent::ButtonReleased(MouseButton::Left) => {
@@ -1045,6 +1061,7 @@ impl ServiceModel {
         id: Id,
         event: &WindowEvent,
     ) -> Task<cosmic::Action<<ServiceModel as cosmic::Application>::Message>> {
+        tracing::trace!("window: {event:?}");
         match event {
             // WindowEvent::Resized(size) => is handled by on_window_resize() override
             WindowEvent::Moved(point) => {
