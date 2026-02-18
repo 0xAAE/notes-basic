@@ -83,6 +83,10 @@ impl StickyWindow {
             .ok_or(StickyWindowError::EditingIsOff)
     }
 
+    pub fn is_editing(&self) -> bool {
+        self.edit_context.is_some()
+    }
+
     pub fn do_edit_action(&mut self, action: Action) -> Result<(), StickyWindowError> {
         self.edit_context
             .as_mut()
