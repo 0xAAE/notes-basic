@@ -22,6 +22,8 @@ cargo-target-dir := env('CARGO_TARGET_DIR', 'target')
 appdata := appid + '.metainfo.xml'
 # Application's desktop entry
 desktop := appid + '.desktop'
+# Application's service desktop entry to launch standalone
+desktop-svc := appid + '_service' + '.desktop'
 # Application's icon.
 icon-svg := appid + '.svg'
 
@@ -31,6 +33,7 @@ appdata-dst := base-dir / 'share' / 'appdata' / appdata
 bin-dst-app := base-dir / 'bin' / applet
 bin-dst-svc := base-dir / 'bin' / service
 desktop-dst := base-dir / 'share' / 'applications' / desktop
+desktop-svc-dst := base-dir / 'share' / 'applications' / desktop-svc
 icons-dst := base-dir / 'share' / 'icons' / 'hicolor'
 icon-svg-dst := icons-dst / 'scalable' / 'apps' / icon-svg
 
@@ -101,6 +104,7 @@ install:
     install -Dm0755 {{ cargo-target-dir / 'release' / applet }} {{bin-dst-app}}
     install -Dm0755 {{ cargo-target-dir / 'release' / service }} {{bin-dst-svc}}
     install -Dm0644 {{ 'resources' / desktop }} {{desktop-dst}}
+    install -Dm0644 {{ 'resources' / desktop-svc }} {{desktop-svc-dst}}
     install -Dm0644 {{ 'resources' / appdata }} {{appdata-dst}}
     install -Dm0644 {{ 'resources' / 'icons' / 'hicolor' / 'scalable' / 'apps' / icon-svg }} {{icon-svg-dst}}
 

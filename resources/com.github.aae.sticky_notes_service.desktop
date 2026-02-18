@@ -1,0 +1,14 @@
+[Desktop Entry]
+Name=Sticky Notes
+Comment=Implementation of sticky notes for Cosmic desktop environment
+Type=Application
+Icon=com.github.aae.sticky_notes
+Exec=notes-service
+Terminal=false
+StartupNotify=false
+Categories=COSMIC
+Keywords=COSMIC
+NoDisplay=false
+X-CosmicApplet=false
+X-CosmicHoverPopup=Auto
+MimeType=
