@@ -69,34 +69,32 @@ check *args:
 check-json: (check '--message-format=json')
 
 # Compiles all targets with release profile
-release:
-    #cargo build --release --bin notes-service --bin notes-applet
-    cargo build --release --bin {{service}} --bin {{applet}}
+release *args:
+    cargo build --release --bin {{service}} --bin {{applet}} {{args}}
 
 # Compiles all targets with debug profile
-debug:
-    #cargo build --bin notes-service --bin notes-applet
-    cargo build --bin {{service}} --bin {{applet}}
+debug *args:
+    cargo build --bin {{service}} --bin {{applet}} {{args}}
 
 # Run the application for debugging purposes
 rund *args:
     env RUST_BACKTRACE=full RUST_LOG={{log-tracing}} cargo run --bin {{args}}
 
 # Run applet (debug)
-rund-applet: (rund applet)
+rund-applet *args: (rund applet args)
 
 # Run service (debug)
-rund-service: (rund service)
+rund-service *args: (rund service args)
 
 # Run the application for testing purposes
 run *args:
     env RUST_BACKTRACE=full RUST_LOG={{log-tracing}} cargo run --release --bin {{args}}
 
 # Run applet (release)
-run-applet: (run applet)
+run-applet *args: (run applet args)
 
 # Run service (release)
-run-service: (run service)
+run-service *args: (run service args)
 
 # Installs files
 install:

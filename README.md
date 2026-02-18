@@ -177,6 +177,8 @@ There are two components must start
 A [justfile](./justfile) is included by default for the [casey/just][just] command runner.
 
 ### Develop and build
+
+- `just --list` briefly displays all recipes
 - `just` does the same as 
 ```
 just check
@@ -196,5 +198,35 @@ just rund-applet
 - `sudo just install` installs the project into the system
 - `sudo just uninstall` uninstalls the project from the system
 
+## Troubleshooting
+
+### Icons on sticky window toolbar are absent, every or any of them
+
+**Solution**. By default, the application uses [freedesktop] icons located in the predefined directories. If somehow icons could not be found it is possible to re-build application with feature `embed_icons` is on. The feature forces to embed all icons into binary so no icon looking up is required. In this case quick start is
+```
+just release --features embed_icons
+just run-service --features embed_icons
+sudo just install
+```
+
 [rust]: https://rust-lang.org/tools/install
 [just]: https://github.com/casey/just
+[freedesktop]: https://specifications.freedesktop.org/icon-theme/latest
+
+### To improve popup menu running notes-service standalone (without an applet) in Cosmic DE
+
+**Solution**. By default, the application uses built-in dropdown styled menu which works well in Gnome etc. If desktop environment is Cosmic it is possible to use popup menu similar to applet. To enable feature `applet_popup` must be on
+```
+just release --features applet_popup
+just run-service --features applet_popup
+sudo just install
+```
+
+### To activate many build features
+
+Build features could be combined while building the application binary. Example
+```
+just release --features applet_popup,embed_icons
+just run-service --features applet_popup,embed_icons
+sudo just install
+```
