@@ -85,6 +85,17 @@ Example: `2_000`
 
 Default value: `1_000`
 
+### autosave_period_ms
+optional
+
+If this parameter is non zero it defines the period of time in milliseconds to autosave all changes in notes. If it is set to 0 autosave feature is off.
+
+Value type: `integer`
+
+Example: `0`
+
+Default value: `30_000`
+
 ### import_file
 optional
 
