@@ -26,6 +26,8 @@ pub struct Config {
     pub note_min_width: usize,
     pub note_min_height: usize,
     pub connect_service_pause_ms: u64,
+    // Test and save period. If 0 autosave is off:
+    pub autosave_period_ms: u64,
 }
 
 impl Default for Config {
@@ -50,6 +52,7 @@ impl Default for Config {
             note_min_height: 64,
             toolbar_icon_size: ICON_SIZE,
             connect_service_pause_ms: 1_000,
+            autosave_period_ms: 30_000,
         }
     }
 }

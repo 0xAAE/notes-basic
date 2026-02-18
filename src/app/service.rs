@@ -30,7 +30,7 @@ use cosmic::{
     widget,
 };
 use palette::bool_mask::BoolMask;
-use std::{collections::HashMap, str::FromStr};
+use std::{collections::HashMap, str::FromStr, time::Duration};
 use uuid::Uuid;
 
 pub struct ServiceFlags;
@@ -69,7 +69,7 @@ pub enum Message {
     AppWindowEvent((Id, WindowEvent)),
     AppMouseEvent((Id, MouseEvent)),
     DbusActivation(dbus_activation::Message),
-    // Ignorable dummy message (example: message is caught in dbus_activation::subscription() but isn't a DbusActivation)
+    // Ignorable dummy message (example: message is caught in dbus_activation::subscription() while it isn't a DbusActivation)
     Ignore,
     // response on window::get_position() request
     WindowPositionResponse((Id, Option<Point>)),
@@ -93,6 +93,8 @@ pub enum Message {
     FontSizeUpdate(u16),                                  // update currently edited style font size
     // Open URL
     OpenUrl(String),
+    // Test autosave timeout
+    AutosaveTimeout,
 }
 
 /// The application model stores app-specific state used to describe its interface and
@@ -189,6 +191,25 @@ impl cosmic::Application for ServiceModel {
                 app.config.import_file.clone(),
             )));
         }
+        // Launch background task to perform autosave if autosave_period_ms > 0
+        if app.config.autosave_period_ms > 0 {
+            let pause = app.config.autosave_period_ms;
+            tracing::debug!("launch testing autosave notes every {pause} msec");
+            startup_tasks.push(
+                // iced_futures::stream::channel will create and read mpsc channel under the hood:
+                Task::stream(cosmic::iced_futures::stream::channel(
+                    1,
+                    async move |mut tx| {
+                        loop {
+                            tokio::time::sleep(Duration::from_millis(pause)).await;
+                            if let Err(e) = tx.try_send(Message::AutosaveTimeout.into()) {
+                                tracing::warn!("failed sending autosave signal: {e}");
+                            }
+                        }
+                    },
+                )),
+            );
+        }
 
         (app, cosmic::task::batch(startup_tasks))
     }
@@ -198,6 +219,7 @@ impl cosmic::Application for ServiceModel {
     /// Application events will be processed through the view. Any messages emitted by
     /// events received by widgets will be passed to the update method.
     fn view(&self) -> Element<'_, Self::Message> {
+        // There is no visible main window at all
         widget::text(fl!("problem-text")).into()
     }
 
@@ -549,6 +571,10 @@ impl cosmic::Application for ServiceModel {
                 Ok(()) => tracing::debug!("go to URL {url}"),
                 Err(err) => tracing::error!("failed to open {url:?}: {err}"),
             },
+
+            Message::AutosaveTimeout => {
+                self.on_autosave();
+            }
         }
         Task::none()
     }
@@ -747,6 +773,18 @@ impl ServiceModel {
         if count_deleted > 0 {
             //todo: what about saving deleted notes too? Maybe with their TTLs
             tracing::warn!("completely drop some deleted notes on exit: {count_deleted}");
+        }
+    }
+
+    fn on_autosave(&mut self) {
+        tracing::debug!("test if notes are changed");
+        if self.notes.is_unsaved() {
+            tracing::debug!("save notes");
+            if let Err(e) = self.save_notes() {
+                tracing::error!("failed saving notes: {e}");
+            }
+        } else {
+            tracing::debug!("no changes in notes to save");
         }
     }
 
