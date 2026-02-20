@@ -5,9 +5,10 @@ use crate::{
         Command,
         about_window::AboutWindow,
         edit_style::EditStyleDialog,
+        popup_variant,
         restore_view::build_restore_view,
         settings_view::build_settings_view,
-        sticky_window::{PopupVariant, StickyWindow},
+        sticky_window::StickyWindow,
         utils::{to_f32, to_usize},
     },
     config::Config,
@@ -393,18 +394,12 @@ impl cosmic::Application for ServiceModel {
 
             // message related to windows management
             Message::StickyWindowCreated(id, note_id) => {
-                #[cfg(feature = "applet-popup")]
-                let popup_variant = PopupVariant::AppletMenu;
-
-                #[cfg(not(feature = "applet-popup"))]
-                let popup_variant = PopupVariant::DropdownMenu(super::build_popup_list());
-
                 self.sticky_windows.insert(
                     id,
                     StickyWindow::new(
                         note_id,
                         self.config.toolbar_icon_size,
-                        self.applet_connected.is_false().then_some(popup_variant),
+                        self.applet_connected.is_false().then_some(popup_variant()),
                     ),
                 );
                 if let Ok(note) = self.notes.try_get_note(&note_id) {
@@ -620,24 +615,24 @@ impl cosmic::Application for ServiceModel {
         }
     }
 
-    #[cfg(feature = "applet-popup")]
+    #[cfg(feature = "wayland")]
     fn style(&self) -> Option<cosmic::iced_runtime::Appearance> {
         Some(cosmic::applet::style())
     }
 }
 
 impl ServiceModel {
-    #[cfg(not(feature = "applet-popup"))]
+    #[cfg(not(feature = "wayland"))]
     fn open_popup(&mut self, _parent_window_id: Id) -> Task<cosmic::Action<Message>> {
         Task::none()
     }
 
-    #[cfg(not(feature = "applet-popup"))]
+    #[cfg(not(feature = "wayland"))]
     fn close_popup(&mut self) -> Task<cosmic::Action<Message>> {
         Task::none()
     }
 
-    #[cfg(feature = "applet-popup")]
+    #[cfg(feature = "wayland")]
     fn open_popup(&mut self, parent_window_id: Id) -> Task<cosmic::Action<Message>> {
         tracing::debug!("build popup menu");
         let new_id = window::Id::unique();
@@ -657,7 +652,7 @@ impl ServiceModel {
         cosmic::iced::platform_specific::shell::commands::popup::get_popup(popup_settings)
     }
 
-    #[cfg(feature = "applet-popup")]
+    #[cfg(feature = "wayland")]
     fn close_popup(&mut self) -> Task<cosmic::Action<Message>> {
         if let Some(p) = self.popup_menu_id.take() {
             tracing::debug!("destroying popup menu");

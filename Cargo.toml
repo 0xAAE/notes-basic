@@ -8,17 +8,15 @@ repository = "https://github.com/0xAAE/sticky-notes"
 default-run = "notes-service"
 
 [features]
-default = []
+default = ["cosmic"]
 # embed svg files into binary and don't use XDG system-wide icons instead:
 embed-icons = []
-# build Cosmic DE applet, run only in Cosmic DE:
-applet = ["applet-popup", "libcosmic/applet", "wayland", "libcosmic/single-instance"]
-# use applet menu as sticky window menu if no applet is connected
-applet-popup = ["libcosmic/applet", "wayland"]
-# build to run in Wayland
-wayland = ["libcosmic/wayland"]
-# build with GPU rendering
-wgpu = ["libcosmic/wgpu"]
+# integral feature to build for running in Cosmic DE
+cosmic = [ "wayland" ]
+# integral feature to build for Wayland fo rrunning run NOT in Cosmic DE (service only, no applet)
+wayland = [ "libcosmic/applet", "libcosmic/wgpu", "libcosmic/wayland" ]
+# integral feature to build for X11 Server (service only, no applet)
+x11 = []
 
 [dependencies]
 anyhow = "1.0"
@@ -52,25 +50,24 @@ features = [
     "a11y",
     # About widget for the app
     "about",
-    # Building the Cosmic panel applet
-    # is controlled by package feature: "applet",
+    # Building the Cosmic panel applet, is controlled by package feature: 
+    #"applet",
     # Uses cosmic-settings-daemon to watch for config file changes
     "dbus-config",
     # Enables desktop files helpers
     "desktop",
     # Support creating additional application windows.
     "multi-window",
-    # On app startup, focuses an existing instance if the app is already open
-    # is controlled by package's feature applet:
+    # On app startup, focuses an existing instance if the app is already open:
     "single-instance",
     # Uses tokio as the executor for the runtime
     "tokio",
     # Windowing support for X11, Windows, Mac, & Redox
     "winit",
-    # Add Wayland support to winit
-    # is controlled by package's feature: "wayland",
-    # It is not recommended for applets: GPU-accelerated rendering
-    # is controlled by package's feature: "wgpu",
+    # Add Wayland support to winit, is controlled by package feature: 
+    #"wayland",
+    # It is not recommended for applets: GPU-accelerated rendering, is controlled by package feature: 
+    #"wgpu",
     # Uncomment if markdown is required
     #"markdown"
 ]

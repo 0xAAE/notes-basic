@@ -209,7 +209,31 @@ just rund-applet
 - `sudo just install` installs the project into the system
 - `sudo just uninstall` uninstalls the project from the system
 
+### Features
+
+The features are to control the build process:
+
+* cosmic (default) - to build both service and applet for running in Cosmic DE
+* wayland - to build only service for running in Wayland-based environment other then Cosmic DE
+* x11 - to build only service for running in X11 Server
+ 
+
 ## Troubleshooting
+
+### Unable to install: just is not found
+
+In some environments (example: Ubuntu) `sudo just` unable to find `just` if it is installed by `cargo install just` into user's home directory.
+
+**Solution** (one of). Locate `just` binary
+```
+which just
+```
+output example: `/home/username/.cargo/bin/just`
+
+Then, create link to just in shared directory
+```
+ln -s /home/username/.cargo/bin/just /usr/local/bin/just
+```
 
 ### Icons on sticky window toolbar are absent, every or any of them
 
@@ -224,20 +248,47 @@ sudo just install
 [just]: https://github.com/casey/just
 [freedesktop]: https://specifications.freedesktop.org/icon-theme/latest
 
-### To improve popup menu running notes-service standalone (without an applet) in Cosmic DE
+### Sticky windows do not restore their positions on start
 
-**Solution**. By default, the application uses built-in dropdown styled menu which works well in Gnome etc. If desktop environment is Cosmic it is possible to use popup menu similar to applet. To enable feature `applet-popup` must be on
+This is limitation from Wayland which allows to control only window size but not its position. Whereas, in X11 notes positions are restored normally.
+
+### There is no Cosmic DE, how to launch
+
+**Solution**. By default the application is built for running in Cosmic DE. To run in another Wayland-based desktop it is possible to build with feature `wayland`:
 ```
-just release --features applet-popup
-just run-service --features applet-popup
+just release --no-default-features --features wayland
+just run-service --no-default-features --features wayland
 sudo just install
 ```
+In this case, there is no Cosmic panel applet available but notes-service works like standalone application itself.
+
+### There is no Wayland at all, how to launch
+
+**Solution**. To run in X11-based desktop one should build with feature `x11`:
+```
+just release --no-default-features --features x11
+just run-service --no-default-features --features x11
+sudo just install
+```
+
+In this case, there is no Cosmic panel applet available but notes-service works like standalone application itself.
 
 ### To activate many build features
 
 Build features could be combined while building the application binary. Example
 ```
-just release --features applet-popup,embed-icons
-just run-service --features applet-popup,embed-icons
+just release --no-default-features --features x11,embed-icons
+just run-service --no-default-features --features x11,embed-icons
 sudo just install
+```
+
+### The system theme is light while some elements are displayed in dark theme
+
+**Solution**. On the first launch some config directories are created automatically. Locate `~/.config/cosmic/com.system76.CosmicTheme.Mode/v1` and enter it
+```
+cd ~/.config/cosmic/com.system76.CosmicTheme.Mode/v1
+```
+Then create file `is_dark` containing value false
+```
+echo false > is_dark
 ```

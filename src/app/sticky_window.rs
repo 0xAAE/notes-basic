@@ -1,5 +1,5 @@
 use super::{
-    get_popup_item_by_index,
+    PopupVariant, get_popup_item_by_index,
     service::Message,
     utils::{cosmic_font, with_background},
 };
@@ -36,14 +36,6 @@ pub struct StickyWindow {
 struct EditContext {
     /// currently edited content
     content: widget::text_editor::Content,
-}
-
-// The feature "applet-popup" is On or Off, the only one variant is actually constructed
-#[allow(unused)]
-pub enum PopupVariant {
-    // using
-    AppletMenu,
-    DropdownMenu(Vec<String>),
 }
 
 impl StickyWindow {
