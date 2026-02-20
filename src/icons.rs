@@ -4,7 +4,7 @@ const ICON_NOTES: &[u8] =
     include_bytes!("../resources/icons/hicolor/scalable/apps/com.github.aae.sticky_notes.svg");
 
 // embedded SVG bytes
-#[cfg(feature = "embed_icons")]
+#[cfg(feature = "embed-icons")]
 pub mod inner {
     use cosmic::widget::icon::{self, Handle};
 
@@ -65,7 +65,7 @@ pub mod inner {
 }
 
 // system wide installed icons
-#[cfg(not(feature = "embed_icons"))]
+#[cfg(not(feature = "embed-icons"))]
 mod inner {
     use cosmic::widget::icon::{self, Handle};
 
