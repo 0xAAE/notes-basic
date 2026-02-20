@@ -81,7 +81,7 @@ features = [
 [[bin]]
 name = "notes-applet"
 path = "src/bin/notes-applet.rs"
-required-features = ["applet"]
+required-features = ["cosmic"]
 
 [[bin]]
 name = "notes-service"
