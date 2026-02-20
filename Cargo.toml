@@ -9,9 +9,16 @@ default-run = "notes-service"
 
 [features]
 default = []
-# to embed svg files into binary and don't use XDG system-wide icons instead:
-embed_icons = []
-applet_popup = []
+# embed svg files into binary and don't use XDG system-wide icons instead:
+embed-icons = []
+# build Cosmic DE applet, run only in Cosmic DE:
+applet = ["applet-popup", "libcosmic/applet", "wayland", "libcosmic/single-instance"]
+# use applet menu as sticky window menu if no applet is connected
+applet-popup = ["libcosmic/applet", "wayland"]
+# build to run in Wayland
+wayland = ["libcosmic/wayland"]
+# build with GPU rendering
+wgpu = ["libcosmic/wgpu"]
 
 [dependencies]
 anyhow = "1.0"
@@ -46,7 +53,7 @@ features = [
     # About widget for the app
     "about",
     # Building the Cosmic panel applet
-    "applet",
+    # is controlled by package feature: "applet",
     # Uses cosmic-settings-daemon to watch for config file changes
     "dbus-config",
     # Enables desktop files helpers
@@ -54,28 +61,30 @@ features = [
     # Support creating additional application windows.
     "multi-window",
     # On app startup, focuses an existing instance if the app is already open
+    # is controlled by package's feature applet:
     "single-instance",
     # Uses tokio as the executor for the runtime
     "tokio",
     # Windowing support for X11, Windows, Mac, & Redox
     "winit",
     # Add Wayland support to winit
-    "wayland",
+    # is controlled by package's feature: "wayland",
     # It is not recommended for applets: GPU-accelerated rendering
-    "wgpu",
-    # Uncomment if markdwon is required
+    # is controlled by package's feature: "wgpu",
+    # Uncomment if markdown is required
     #"markdown"
 ]
 
 # Uncomment to test a locally-cloned libcosmic
 # [patch.'https://github.com/pop-os/libcosmic']
-# libcosmic = { path = "../libcosmic" }
-# cosmic-config = { path = "../libcosmic/cosmic-config" }
-# cosmic-theme = { path = "../libcosmic/cosmic-theme" }
+# libcosmic = { path = "../../../oss/libcosmic" }
+# cosmic-config = { path = "../../../oss/libcosmic/cosmic-config" }
+# cosmic-theme = { path = "../../../oss/libcosmic/cosmic-theme" }
 
 [[bin]]
 name = "notes-applet"
 path = "src/bin/notes-applet.rs"
+required-features = ["applet"]
 
 [[bin]]
 name = "notes-service"

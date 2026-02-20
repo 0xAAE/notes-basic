@@ -38,7 +38,7 @@ struct EditContext {
     content: widget::text_editor::Content,
 }
 
-// While feature "applet_popup" is in use only one variant is actually constructed
+// The feature "applet-popup" is On or Off, the only one variant is actually constructed
 #[allow(unused)]
 pub enum PopupVariant {
     // using

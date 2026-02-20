@@ -17,7 +17,6 @@ use crate::{
 use cosmic::prelude::*;
 use cosmic::{
     app::CosmicFlags,
-    applet,
     cosmic_config::{self, ConfigSet, CosmicConfigEntry},
     dbus_activation,
     iced::{
@@ -273,7 +272,8 @@ impl cosmic::Application for ServiceModel {
                 _ => true,
             })
         } else {
-            widget::text("").into()
+            // There is no visible main window at all
+            widget::text(fl!("problem-text")).into()
         }
     }
 
@@ -393,10 +393,10 @@ impl cosmic::Application for ServiceModel {
 
             // message related to windows management
             Message::StickyWindowCreated(id, note_id) => {
-                #[cfg(feature = "applet_popup")]
+                #[cfg(feature = "applet-popup")]
                 let popup_variant = PopupVariant::AppletMenu;
 
-                #[cfg(not(feature = "applet_popup"))]
+                #[cfg(not(feature = "applet-popup"))]
                 let popup_variant = PopupVariant::DropdownMenu(super::build_popup_list());
 
                 self.sticky_windows.insert(
@@ -620,23 +620,24 @@ impl cosmic::Application for ServiceModel {
         }
     }
 
+    #[cfg(feature = "applet-popup")]
     fn style(&self) -> Option<cosmic::iced_runtime::Appearance> {
-        Some(applet::style())
+        Some(cosmic::applet::style())
     }
 }
 
 impl ServiceModel {
-    #[cfg(not(feature = "applet_popup"))]
+    #[cfg(not(feature = "applet-popup"))]
     fn open_popup(&mut self, _parent_window_id: Id) -> Task<cosmic::Action<Message>> {
         Task::none()
     }
 
-    #[cfg(not(feature = "applet_popup"))]
+    #[cfg(not(feature = "applet-popup"))]
     fn close_popup(&mut self) -> Task<cosmic::Action<Message>> {
         Task::none()
     }
 
-    #[cfg(feature = "applet_popup")]
+    #[cfg(feature = "applet-popup")]
     fn open_popup(&mut self, parent_window_id: Id) -> Task<cosmic::Action<Message>> {
         tracing::debug!("build popup menu");
         let new_id = window::Id::unique();
@@ -656,7 +657,7 @@ impl ServiceModel {
         cosmic::iced::platform_specific::shell::commands::popup::get_popup(popup_settings)
     }
 
-    #[cfg(feature = "applet_popup")]
+    #[cfg(feature = "applet-popup")]
     fn close_popup(&mut self) -> Task<cosmic::Action<Message>> {
         if let Some(p) = self.popup_menu_id.take() {
             tracing::debug!("destroying popup menu");

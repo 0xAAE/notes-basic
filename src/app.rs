@@ -1,20 +1,18 @@
 // SPDX-License-Identifier: MPL-2.0
 
 use crate::fl;
+#[cfg(feature = "applet")]
+pub use applet::AppletModel;
 use cosmic::prelude::*;
-use cosmic::{
-    iced::{Alignment, widget::column},
-    widget,
-};
 use std::str::FromStr;
 use thiserror::Error;
 pub use {
-    applet::AppletModel,
     service::{ServiceFlags, ServiceModel},
     utils::to_f32,
 };
 
 mod about_window;
+#[cfg(feature = "applet")]
 mod applet;
 mod edit_style;
 mod restore_view;
@@ -112,7 +110,7 @@ impl FromStr for Command {
     }
 }
 
-#[cfg(not(feature = "applet_popup"))]
+#[cfg(not(feature = "applet-popup"))]
 fn build_popup_list() -> Vec<String> {
     vec![
         fl!("load"),
@@ -144,6 +142,25 @@ const fn get_popup_item_by_index(index: usize) -> Command {
     }
 }
 
+// dummy method to build StickyWindow: is required because ServiceModel hosts this view in separate window
+#[cfg(not(feature = "applet-popup"))]
+fn build_main_popup_view<F, P, M>(
+    _core: &cosmic::Core,
+    _to_message: F,
+    _is_enabled: P,
+) -> Element<'_, M>
+where
+    // such requirements to Message are defined in cosmic::Application:
+    M: Clone + std::fmt::Debug + Send + 'static,
+    // converter Command -> Message like Message::Signal(Command::Ping):
+    F: Fn(Command) -> M,
+    // tests if menu item should be enabled
+    P: Fn(Command) -> bool,
+{
+    cosmic::widget::text(fl!("problem-text")).into()
+}
+
+#[cfg(feature = "applet-popup")]
 fn build_main_popup_view<F, P, M>(
     core: &cosmic::Core,
     to_message: F,
@@ -157,7 +174,11 @@ where
     // tests if menu item should be enabled
     P: Fn(Command) -> bool,
 {
-    use cosmic::applet as cosmic_applet;
+    use cosmic::{
+        applet as cosmic_applet,
+        iced::{Alignment, widget::column},
+        widget,
+    };
 
     let mut save_load = widget::column::with_capacity(2);
     if is_enabled(Command::LoadNotes) {
