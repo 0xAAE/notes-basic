@@ -6,7 +6,7 @@ There are two components in sticky-notes
 * *notes-service* is a core application to deal with notes and settings
 * *notes-applet* is an applet in Cosmic Panel providing main menu for *notes-service*
 
-Other details is to be provided when version 0.1.0 has come
+![example](resources/doc/screen-01.png)
 
 ## Quick start
 
