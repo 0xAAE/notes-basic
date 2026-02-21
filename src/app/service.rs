@@ -1046,6 +1046,14 @@ impl ServiceModel {
             }
             MouseEvent::CursorEntered => {
                 self.cursor_window.replace(id);
+                if let Some(sticky_window) = self.sticky_windows.get_mut(&id) {
+                    sticky_window.set_toolbar_visibility(true);
+                }
+            }
+            MouseEvent::CursorLeft => {
+                if let Some(sticky_window) = self.sticky_windows.get_mut(&id) {
+                    sticky_window.set_toolbar_visibility(false);
+                }
             }
             _ => {}
         }

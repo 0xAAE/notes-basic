@@ -116,10 +116,11 @@ pub enum PopupVariant {
     DropdownMenu(Vec<String>),
 }
 
+#[must_use]
 pub fn popup_variant() -> PopupVariant {
     #[cfg(feature = "wayland")]
     return PopupVariant::AppletMenu;
-    #[cfg(feature = "x11")]
+    #[cfg(not(feature = "wayland"))]
     return PopupVariant::DropdownMenu(x11::build_popup_list());
 }
 
