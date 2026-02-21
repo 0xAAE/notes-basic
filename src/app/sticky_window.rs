@@ -31,6 +31,8 @@ pub struct StickyWindow {
     icon_size: u16,
     // optionally display popup menu
     popup_menu: Option<PopupVariant>,
+    // optionally display a toolbar in view mode (in edit mode the toolbar is always visible)
+    view_toolbar: bool,
 }
 
 struct EditContext {
@@ -46,6 +48,7 @@ impl StickyWindow {
             style_names: None,
             icon_size,
             popup_menu,
+            view_toolbar: false,
         }
     }
 
@@ -94,6 +97,12 @@ impl StickyWindow {
         self.style_names = None;
     }
 
+    // true - toolbar is visible
+    // false - toolbar is hidden
+    pub fn set_toolbar_visibility(&mut self, is_visible: bool) {
+        self.view_toolbar = is_visible;
+    }
+
     #[allow(clippy::too_many_lines)]
     pub fn build_view<'a>(
         &'a self,
@@ -135,89 +144,95 @@ impl StickyWindow {
         {
             let is_locked = note.is_locked();
 
-            let mut note_toolbar =
-                widget::row::with_capacity(8).spacing(cosmic::theme::spacing().space_s);
-            // display menu variant optionally:
-            if let Some(menu) = &self.popup_menu {
-                if let PopupVariant::DropdownMenu(popup_list) = menu {
-                    note_toolbar = note_toolbar.push(widget::dropdown(popup_list, None, |index| {
-                        Message::Signal(get_popup_item_by_index(index))
-                    }));
-                } else {
-                    // PopupVariant::AppletMenu
-                    note_toolbar = note_toolbar.push(
+            let note_toolbar = if self.view_toolbar {
+                let mut toolbar =
+                    widget::row::with_capacity(8).spacing(cosmic::theme::spacing().space_s);
+                // display menu variant optionally:
+                if let Some(menu) = &self.popup_menu {
+                    if let PopupVariant::DropdownMenu(popup_list) = menu {
+                        toolbar =
+                            toolbar.push(widget::dropdown(popup_list, None, |index| {
+                                Message::Signal(get_popup_item_by_index(index))
+                            }));
+                    } else {
+                        // PopupVariant::AppletMenu
+                        toolbar = toolbar.push(
+                            icons
+                                .menu()
+                                .apply(widget::button::icon)
+                                .icon_size(self.icon_size)
+                                .on_press(Message::OpenMenu(window_id))
+                                .width(Length::Shrink),
+                        );
+                    }
+                }
+                toolbar = toolbar.push(
+                    if is_locked {
+                        icons.unlock()
+                    } else {
+                        icons.lock()
+                    }
+                    .apply(widget::button::icon)
+                    .icon_size(self.icon_size)
+                    .on_press(Message::NoteLock(window_id, !is_locked))
+                    .width(Length::Shrink),
+                );
+                if !is_locked {
+                    toolbar = toolbar.push(
                         icons
-                            .menu()
+                            .edit()
                             .apply(widget::button::icon)
                             .icon_size(self.icon_size)
-                            .on_press(Message::OpenMenu(window_id))
+                            .on_press(Message::NoteEdit(window_id, true))
+                            .width(Length::Shrink),
+                    );
+                    if let Some(styles) = &self.style_names {
+                        // add style pick list
+                        toolbar = toolbar.push(
+                            widget::dropdown(
+                                styles,
+                                notes
+                                    .try_get_note_style_index(self.note_id)
+                                    .map_err(|e| tracing::error!("failed to get style index: {e}"))
+                                    .ok(),
+                                move |index| Message::NoteStyleSelected(window_id, index),
+                            )
+                            .placeholder(fl!("select-default-style")),
+                        );
+                    } else {
+                        // add button "down"
+                        toolbar = toolbar.push(
+                            icons
+                                .down()
+                                .apply(widget::button::icon)
+                                .icon_size(self.icon_size)
+                                .on_press(Message::NoteStyle(window_id))
+                                .width(Length::Shrink),
+                        );
+                    }
+                    toolbar = toolbar.push(
+                        icons
+                            .delete()
+                            .apply(widget::button::icon)
+                            .icon_size(self.icon_size)
+                            .on_press(Message::NoteDelete(window_id))
                             .width(Length::Shrink),
                     );
                 }
-            }
-            note_toolbar = note_toolbar.push(
-                if is_locked {
-                    icons.unlock()
-                } else {
-                    icons.lock()
-                }
-                .apply(widget::button::icon)
-                .icon_size(self.icon_size)
-                .on_press(Message::NoteLock(window_id, !is_locked))
-                .width(Length::Shrink),
-            );
-            if !is_locked {
-                note_toolbar = note_toolbar.push(
-                    icons
-                        .edit()
-                        .apply(widget::button::icon)
-                        .icon_size(self.icon_size)
-                        .on_press(Message::NoteEdit(window_id, true))
-                        .width(Length::Shrink),
-                );
-                if let Some(styles) = &self.style_names {
-                    // add style pick list
-                    note_toolbar = note_toolbar.push(
-                        widget::dropdown(
-                            styles,
-                            notes
-                                .try_get_note_style_index(self.note_id)
-                                .map_err(|e| tracing::error!("failed to get style index: {e}"))
-                                .ok(),
-                            move |index| Message::NoteStyleSelected(window_id, index),
-                        )
-                        .placeholder(fl!("select-default-style")),
-                    );
-                } else {
-                    // add button "down"
-                    note_toolbar = note_toolbar.push(
+                toolbar = toolbar
+                    .push(widget::horizontal_space().width(Length::Fill))
+                    .push(
                         icons
-                            .down()
+                            .create()
                             .apply(widget::button::icon)
                             .icon_size(self.icon_size)
-                            .on_press(Message::NoteStyle(window_id))
+                            .on_press(Message::NoteNew)
                             .width(Length::Shrink),
                     );
-                }
-                note_toolbar = note_toolbar.push(
-                    icons
-                        .delete()
-                        .apply(widget::button::icon)
-                        .icon_size(self.icon_size)
-                        .on_press(Message::NoteDelete(window_id))
-                        .width(Length::Shrink),
-                );
-            }
-            note_toolbar = note_toolbar
-                .push(widget::horizontal_space().width(Length::Fill))
-                .push(
-                    icons
-                        .create()
-                        .apply(widget::button::icon)
-                        .icon_size(self.icon_size)
-                        .on_press(Message::NoteNew)
-                        .width(Length::Shrink),
-                );
+                toolbar
+            } else {
+                widget::row()
+            };
 
             let note_content = widget::column::with_capacity(2)
                 .width(Length::Fill)
