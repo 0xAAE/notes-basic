@@ -4,7 +4,6 @@ name := 'sticky-notes'
 # Name of the application's applet binary.
 applet := 'notes-applet'
 
-
 # Name of the application's service binary.
 service := 'notes-service'
 

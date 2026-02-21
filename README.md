@@ -72,7 +72,7 @@ Value type: `string` (i.e. surrounded with double quotes)
 
 Example: `"/home/user/.bin/notes-service"`
 
-Default value: `"/usr/local/bin/notes-service"`
+Default value: `"/usr/bin/notes-service"`
 
 ### connect_service_pause_ms
 optional

@@ -7,7 +7,7 @@ use cosmic::{
 use crate::app::to_f32;
 
 const DEF_DATA_FILE: &str = ".config/indicator-stickynotes";
-const DEF_SERVICE_BIN: &str = "/usr/local/bin/notes-service";
+const DEF_SERVICE_BIN: &str = "/usr/bin/notes-service";
 const ICON_SIZE: u16 = 16;
 
 #[derive(Debug, Clone, CosmicConfigEntry, Eq, PartialEq)]
