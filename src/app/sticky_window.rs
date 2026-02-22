@@ -150,10 +150,9 @@ impl StickyWindow {
                 // display menu variant optionally:
                 if let Some(menu) = &self.popup_menu {
                     if let PopupVariant::DropdownMenu(popup_list) = menu {
-                        toolbar =
-                            toolbar.push(widget::dropdown(popup_list, None, |index| {
-                                Message::Signal(get_popup_item_by_index(index))
-                            }));
+                        toolbar = toolbar.push(widget::dropdown(popup_list, None, |index| {
+                            Message::Signal(get_popup_item_by_index(index))
+                        }));
                     } else {
                         // PopupVariant::AppletMenu
                         toolbar = toolbar.push(
