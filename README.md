@@ -36,21 +36,51 @@ sudo apt install libxkbcommon-dev
 * Create working directory to host the project code and temporary files. Example
 ```
 mkdir ~/build
+```
+```
 cd ~/build
 ```
 * Clone the project
 ```
 git clone https://github.com/0xAAE/sticky-notes.git
+```
+```
 cd sticky-notes
 ```
 * Build release version
+
+Cosmic DE
 ```
 just release
 ```
+Wayland-based DE:
+```
+just build-release --no-default-features --features wayland
+```
+X11-based DE:
+```
+just build-release --no-default-features --features x11
+```
+
+### Test and install
+
 * (optional) Run to test everything is good in terminal
+
+Cosmic DE
 ```
 just run-service
 ```
+Wayland-based DE:
+```
+just run-service --no-default-features --features wayland
+```
+
+X11-based DE:
+```
+just run-service --no-default-features --features x11
+```
+
+
 Stop notes-service in terminal with `Ctrl-C`
 * Install sticky-notes
 ```
@@ -240,7 +270,11 @@ ln -s /home/username/.cargo/bin/just /usr/local/bin/just
 **Solution**. By default, the application uses [freedesktop] icons located in the predefined directories. If somehow icons could not be found it is possible to re-build application with feature `embed-icons` is on. The feature forces to embed all icons into binary so no icon looking up is required. In this case quick start is
 ```
 just release --features embed-icons
+```
+```
 just run-service --features embed-icons
+```
+```
 sudo just install
 ```
 
@@ -256,8 +290,12 @@ This is limitation from Wayland which allows to control only window size but not
 
 **Solution**. By default the application is built for running in Cosmic DE. To run in another Wayland-based desktop it is possible to build with feature `wayland`:
 ```
-just release --no-default-features --features wayland
+just build-release --no-default-features --features wayland
+```
+```
 just run-service --no-default-features --features wayland
+```
+```
 sudo just install
 ```
 In this case, there is no Cosmic panel applet available but notes-service works like standalone application itself.
@@ -266,8 +304,12 @@ In this case, there is no Cosmic panel applet available but notes-service works 
 
 **Solution**. To run in X11-based desktop one should build with feature `x11`:
 ```
-just release --no-default-features --features x11
+just build-release --no-default-features --features x11
+```
+```
 just run-service --no-default-features --features x11
+```
+```
 sudo just install
 ```
 
@@ -278,7 +320,11 @@ In this case, there is no Cosmic panel applet available but notes-service works 
 Build features could be combined while building the application binary. Example
 ```
 just release --no-default-features --features x11,embed-icons
+```
+```
 just run-service --no-default-features --features x11,embed-icons
+```
+```
 sudo just install
 ```
 

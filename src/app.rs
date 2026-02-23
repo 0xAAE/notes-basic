@@ -121,17 +121,17 @@ pub fn popup_variant() -> PopupVariant {
     #[cfg(feature = "cosmic")]
     return PopupVariant::AppletMenu;
     #[cfg(not(feature = "cosmic"))]
-    return PopupVariant::DropdownMenu(x11::build_popup_list());
+    return PopupVariant::DropdownMenu(dropdown_menu::build_popup_list());
 }
 
 #[cfg(feature = "cosmic")]
-pub use cosmic::build_main_popup_view;
+pub use popup_menu::build_main_popup_view;
 
 #[cfg(not(feature = "cosmic"))]
-pub use wayland::{build_main_popup_view, build_popup_list};
+pub use dropdown_menu::{build_main_popup_view, build_popup_list};
 
 #[cfg(feature = "cosmic")]
-mod cosmic {
+mod popup_menu {
     use super::Command;
     use crate::fl;
     use cosmic::prelude::*;
@@ -253,7 +253,7 @@ mod cosmic {
 }
 
 #[cfg(not(feature = "cosmic"))]
-mod wayland {
+mod dropdown_menu {
     use super::Command;
     use crate::fl;
     use cosmic::prelude::*;
