@@ -118,20 +118,20 @@ pub enum PopupVariant {
 
 #[must_use]
 pub fn popup_variant() -> PopupVariant {
-    #[cfg(feature = "wayland")]
+    #[cfg(feature = "cosmic")]
     return PopupVariant::AppletMenu;
-    #[cfg(not(feature = "wayland"))]
+    #[cfg(not(feature = "cosmic"))]
     return PopupVariant::DropdownMenu(x11::build_popup_list());
 }
 
-#[cfg(feature = "wayland")]
-pub use wayland::build_main_popup_view;
+#[cfg(feature = "cosmic")]
+pub use cosmic::build_main_popup_view;
 
-#[cfg(not(feature = "wayland"))]
-pub use x11::{build_main_popup_view, build_popup_list};
+#[cfg(not(feature = "cosmic"))]
+pub use wayland::{build_main_popup_view, build_popup_list};
 
-#[cfg(feature = "wayland")]
-mod wayland {
+#[cfg(feature = "cosmic")]
+mod cosmic {
     use super::Command;
     use crate::fl;
     use cosmic::prelude::*;
@@ -252,8 +252,8 @@ mod wayland {
     }
 }
 
-#[cfg(not(feature = "wayland"))]
-mod x11 {
+#[cfg(not(feature = "cosmic"))]
+mod wayland {
     use super::Command;
     use crate::fl;
     use cosmic::prelude::*;

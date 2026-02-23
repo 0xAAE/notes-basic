@@ -615,24 +615,24 @@ impl cosmic::Application for ServiceModel {
         }
     }
 
-    #[cfg(feature = "wayland")]
+    #[cfg(feature = "cosmic")]
     fn style(&self) -> Option<cosmic::iced_runtime::Appearance> {
         Some(cosmic::applet::style())
     }
 }
 
 impl ServiceModel {
-    #[cfg(not(feature = "wayland"))]
+    #[cfg(not(feature = "cosmic"))]
     fn open_popup(&mut self, _parent_window_id: Id) -> Task<cosmic::Action<Message>> {
         Task::none()
     }
 
-    #[cfg(not(feature = "wayland"))]
+    #[cfg(not(feature = "cosmic"))]
     fn close_popup(&mut self) -> Task<cosmic::Action<Message>> {
         Task::none()
     }
 
-    #[cfg(feature = "wayland")]
+    #[cfg(feature = "cosmic")]
     fn open_popup(&mut self, parent_window_id: Id) -> Task<cosmic::Action<Message>> {
         tracing::debug!("build popup menu");
         let new_id = window::Id::unique();
@@ -652,7 +652,7 @@ impl ServiceModel {
         cosmic::iced::platform_specific::shell::commands::popup::get_popup(popup_settings)
     }
 
-    #[cfg(feature = "wayland")]
+    #[cfg(feature = "cosmic")]
     fn close_popup(&mut self) -> Task<cosmic::Action<Message>> {
         if let Some(p) = self.popup_menu_id.take() {
             tracing::debug!("destroying popup menu");
