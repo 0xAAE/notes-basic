@@ -100,7 +100,8 @@ run-service *args: (run service args)
 
 # Installs files
 install:
-    install -Dm0755 {{ cargo-target-dir / 'release' / applet }} {{bin-dst-app}}
+    # if [[ {{ cargo-target-dir / 'release' / applet}} ]]; then install -Dm0755 {{ cargo-target-dir / 'release' / applet }} {{bin-dst-app}}; fi
+    bash -c '[[ {{ cargo-target-dir / 'release' / applet}} ]] && install -Dm0755 {{ cargo-target-dir / 'release' / applet }} {{bin-dst-app}} || echo'
     install -Dm0755 {{ cargo-target-dir / 'release' / service }} {{bin-dst-svc}}
     install -Dm0644 {{ 'resources' / desktop }} {{desktop-dst}}
     install -Dm0644 {{ 'resources' / desktop-svc }} {{desktop-svc-dst}}
