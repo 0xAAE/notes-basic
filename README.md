@@ -35,17 +35,11 @@ sudo apt install libxkbcommon-dev
 * Open terminal
 * Create working directory to host the project code and temporary files. Example
 ```
-mkdir ~/build
-```
-```
-cd ~/build
+mkdir ~/build && cd ~/build
 ```
 * Clone the project
 ```
-git clone https://github.com/0xAAE/sticky-notes.git
-```
-```
-cd sticky-notes
+git clone https://github.com/0xAAE/sticky-notes.git && cd sticky-notes
 ```
 * Build release version
 
