@@ -45,40 +45,45 @@ git clone https://github.com/0xAAE/sticky-notes.git && cd sticky-notes
 
 Cosmic DE
 ```
-just release
+just build-cosmic
 ```
 Wayland-based DE:
 ```
-just build-release --no-default-features --features wayland
+just build-wayland
 ```
 X11-based DE:
 ```
-just build-release --no-default-features --features x11
+just build-x
 ```
 
-### Test and install
+### Run for testing (optional)
 
-* (optional) Run to test everything is good in terminal
+* Run to test everything is good in terminal
 
 Cosmic DE
 ```
-just run-service
+just run
 ```
 Wayland-based DE:
 ```
-just run-service --no-default-features --features wayland
+just run-wayland
 ```
 
 X11-based DE:
 ```
-just run-service --no-default-features --features x11
+just run-x
 ```
 
+* Stop application working in terminal with `Ctrl-C`
 
-Stop notes-service in terminal with `Ctrl-C`
+### Install
 * Install sticky-notes
 ```
 sudo just install
+```
+* In Cosmic DE additionally install sticky-notes applet to place it into Cosmic Panel
+```
+sudo just install-applet
 ```
 
 ## Configuration
@@ -202,33 +207,35 @@ Value type: `JSON string` (i.e. in double quotes).
 
 ## Build, install and run
 
-There are two components must start
+There are two components should start
 
 * notes-service
 * notes-applet
 
-:point_up: The *notes-applet* automatically launches *notes-service* if it is not detected and if **service_bin** parameter is set in config. User might setup **service_bin** once and require to launch only *notes-applet* then.
+:point_up: The *notes-applet* automatically launches *notes-service* if it is not detected and if **service_bin** parameter is set in config. User might setup **service_bin** once in configuration then to launch only *notes-applet*.
 
 A [justfile](./justfile) is included by default for the [casey/just][just] command runner.
 
-### Develop and build
-
 - `just --list` briefly displays all recipes
-- `just` does the same as 
-```
-just check
-just debug
-just rund-applet
-```
-- `just debug` builds both *notes-applet* and *notes-service* with debug profile
-- `just release` builds both *notes-applet* and *notes-service* with release profile
-- `just check` runs clippy on the project to check for linter warnings
-- `cargo test` invokes all unit tests
+- `just clean` cleans the project by removing all generated files
+### Develop
+- `just check` runs formatting then runs clippy on the project to check for linter warnings
+- `just dbg` builds and runs debug version of *notes-service*
+- `just dbg-applet` builds debug version of both *notes-applet* and *notes-service* then runs *notes-applet* which in its turn launches *notes-service* itself
+- `cargo test` invokes provided unit tests
+### Build
+- `just build` builds release version of *notes-service* targeting the Cosmic DE
+- `just build-cosmic` builds release version of both *notes-applet* and *notes-service* targeting the Cosmic DE
+- `just build-wayland` builds release version of the *notes-service* targeting the Wayland-based DE
+- `just build-x` builds release version of the *notes-service* targeting the X11-based DE
+
 ### Run
-- `just rund-service` builds and runs the *notes-service* with debug profile
-- `just rund-applet` builds and runs the *notes-applet* with debug profile
-- `just run-service` builds and runs the *notes-service* with release profile
-- `just run-applet` builds and runs the *notes-applet* with release profile
+- `just` is the same as `just run`
+- `just run` runs release version of the *notes-service* targeting the Cosmic DE
+- `just run-cosmic` is the same as `just run`
+- `just run-applet` runs release version of the *notes-applet* targeting the Cosmic DE
+- `just run-wayland` runs release version of the *notes-service* targeting the Wayland-based DE
+- `just run-x` runs release version of the *notes-service* targeting the X11-based DE
 ### Install
 - `sudo just install` installs the project into the system
 - `sudo just uninstall` uninstalls the project from the system
@@ -237,10 +244,12 @@ just rund-applet
 
 The features are to control the build process:
 
-* cosmic (default) - to build both service and applet for running in Cosmic DE
-* wayland - to build only service for running in Wayland-based environment other then Cosmic DE
-* x11 - to build only service for running in X11 Server
- 
+* `cosmic` (default) - to build both service and applet for running in Cosmic DE
+* `wayland` - to build only service for running in Wayland-based environment other then Cosmic DE
+* `x11` - to build only service for running in X11 Server
+
+and to embed icons into binary:
+* `embed-icons` - embed svg files into binary file and don't use XDG system-wide icons
 
 ## Troubleshooting
 
@@ -263,10 +272,10 @@ ln -s /home/username/.cargo/bin/just /usr/local/bin/just
 
 **Solution**. By default, the application uses [freedesktop] icons located in the predefined directories. If somehow icons could not be found it is possible to re-build application with feature `embed-icons` is on. The feature forces to embed all icons into binary so no icon looking up is required. In this case quick start is
 ```
-just release --features embed-icons
+just build-cosmic --features embed-icons
 ```
 ```
-just run-service --features embed-icons
+just run-cosmic --features embed-icons
 ```
 ```
 sudo just install
@@ -284,10 +293,10 @@ This is limitation from Wayland which allows to control only window size but not
 
 **Solution**. By default the application is built for running in Cosmic DE. To run in another Wayland-based desktop it is possible to build with feature `wayland`:
 ```
-just build-release --no-default-features --features wayland
+just build-wayland
 ```
 ```
-just run-service --no-default-features --features wayland
+just run-wayland
 ```
 ```
 sudo just install
@@ -298,10 +307,10 @@ In this case, there is no Cosmic panel applet available but notes-service works 
 
 **Solution**. To run in X11-based desktop one should build with feature `x11`:
 ```
-just build-release --no-default-features --features x11
+just build-x
 ```
 ```
-just run-service --no-default-features --features x11
+just run-x
 ```
 ```
 sudo just install
@@ -313,18 +322,19 @@ In this case, there is no Cosmic panel applet available but notes-service works 
 
 Build features could be combined while building the application binary. Example
 ```
-just release --no-default-features --features x11,embed-icons
+just build --no-default-features --features x11,embed-icons
 ```
 ```
-just run-service --no-default-features --features x11,embed-icons
+just run --no-default-features --features x11,embed-icons
 ```
 ```
 sudo just install
 ```
 
-### The system theme is light while some elements are displayed in dark theme
+### The system theme is light while some elements are displayed like in dark theme
 
-**Solution**. On the first launch some config directories are created automatically. Locate `~/.config/cosmic/com.system76.CosmicTheme.Mode/v1` and enter it
+**Solution**. On the first launch some config directories are created automatically. Locate the
+`~/.config/cosmic/com.system76.CosmicTheme.Mode/v1` directory and enter it
 ```
 cd ~/.config/cosmic/com.system76.CosmicTheme.Mode/v1
 ```

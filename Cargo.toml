@@ -9,7 +9,7 @@ default-run = "notes-service"
 
 [features]
 default = ["cosmic"]
-# embed svg files into binary and don't use XDG system-wide icons instead:
+# embed svg files into binary and don't use XDG system-wide icons:
 embed-icons = []
 # integral feature to build for running in Cosmic DE
 cosmic = [ "wayland" ]
